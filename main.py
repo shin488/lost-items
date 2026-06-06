@@ -375,15 +375,29 @@ def App(page: ft.Page):
             ft.Tabs(
                 selected_index=selected_tab,
                 on_change=lambda e: set_selected_tab(e.control.selected_index),
-                tabs=[
-                    ft.Tab(text="探す", icon=ft.Icons.SEARCH,
-                           content=ft.Container(content=tab_search, padding=10)),
-                    ft.Tab(text="記録", icon=ft.Icons.ADD_CIRCLE,
-                           content=ft.Container(content=tab_record, padding=10)),
-                    ft.Tab(text="ランキング", icon=ft.Icons.EMOJI_EVENTS,
-                           content=ft.Container(content=tab_ranking, padding=10)),
-                ],
+                length=3,
                 expand=True,
+                content=ft.Column(
+                    expand=True,
+                    spacing=0,
+                    controls=[
+                        ft.TabBar(
+                            tabs=[
+                                ft.Tab(label="探す", icon=ft.Icons.SEARCH),
+                                ft.Tab(label="記録", icon=ft.Icons.ADD_CIRCLE),
+                                ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
+                            ],
+                        ),
+                        ft.TabBarView(
+                            expand=True,
+                            controls=[
+                                ft.Container(content=tab_search, padding=10),
+                                ft.Container(content=tab_record, padding=10),
+                                ft.Container(content=tab_ranking, padding=10),
+                            ],
+                        ),
+                    ],
+                ),
             ))
 
     return ft.Column([body], expand=True)
