@@ -761,13 +761,14 @@ def main(page: ft.Page):
         ],
     )
 
-    load_from_storage()
-
     page.overlay.append(date_picker)
     page.add(ft.SafeArea(tabs))
 
     page.update()
+    load_from_storage()
     refresh()
+
+    page.on_load = lambda e: (load_from_storage(), refresh())
 
 
 ft.run(main, view=ft.AppView.WEB_BROWSER)
