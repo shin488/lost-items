@@ -658,7 +658,7 @@ def main(page: ft.Page):
         label="カテゴリで絞り込み",
         options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
         width=300,
-        on_change=on_search_cat_change,
+        on_select=on_search_cat_change,
     )
 
     search_view = ft.Column([
@@ -667,7 +667,7 @@ def main(page: ft.Page):
         search_dropdown,
         ft.Row([
             ft.TextField(ref=search_ref, label="なくした物は？", hint_text="例: 財布、鍵、スマホ", expand=True),
-            ft.ElevatedButton("探す", on_click=on_search_click, icon=ft.Icons.SEARCH),
+            ft.Button("探す", on_click=on_search_click, icon=ft.Icons.SEARCH),
         ]),
         chips_container,
         ft.Divider(height=8),
@@ -688,7 +688,7 @@ def main(page: ft.Page):
         ),
         ft.TextField(ref=date_ref, label="なくした日 (任意)", hint_text="YYYY-MM-DD", width=300),
         ft.TextField(ref=location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
-        ft.ElevatedButton("記録する", on_click=on_add_record, icon=ft.Icons.ADD),
+        ft.Button("記録する", on_click=on_add_record, icon=ft.Icons.ADD),
         ft.Divider(height=16),
         ft.Row([
             ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
