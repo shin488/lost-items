@@ -18,7 +18,7 @@ def fuzzy_match(query: str, text: str) -> bool:
 
 
 def parse_weekday(d: str):
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m-%d", "%m/%d"):
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M", "%m-%d", "%m/%d"):
         try:
             return datetime.strptime(d, fmt).weekday()
         except ValueError:
@@ -155,7 +155,7 @@ def main(page: ft.Page):
             "name": name,
             "category": category_ref.current.value or "その他",
             "location": location,
-            "lost_date": date_ref.current.value.strip() or datetime.now().strftime("%Y-%m-%d"),
+            "lost_date": (date_ref.current.value or "").strip() or datetime.now().strftime("%Y-%m-%d"),
             "found_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "resolved": False,
             "resolution_date": None,
@@ -543,11 +543,6 @@ def main(page: ft.Page):
         if weekday_counts:
             lines.append(f"📅 ピーク曜日: {peak_wd_name}")
         lines.append(f"✅ 解決率: {resolution_rate:.0f}% ({resolved_cnt}/{total})")
-        if avg_hours is not None:
-            if avg_hours < 24:
-                lines.append(f"⏱ 平均発見時間: {avg_hours:.0f}時間")
-            else:
-                lines.append(f"⏱ 平均発見時間: {avg_hours/24:.1f}日")
 
         title = f"{focus_icon} あなたは「{focus_type}」"
         return [title] + lines + [""] + advice_lines
@@ -1007,6 +1002,7 @@ def main(page: ft.Page):
                 ref=date_ref,
                 label="なくした日 (任意)",
                 hint_text="タップしてカレンダーから選択",
+                value=datetime.now().strftime("%Y-%m-%d"),
                 width=300,
                 read_only=True,
                 on_focus=lambda _: open_date_picker(),
