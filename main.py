@@ -2,6 +2,7 @@ from datetime import datetime
 from collections import Counter, defaultdict
 import json
 import unicodedata
+import calendar
 
 import flet as ft
 
@@ -144,6 +145,8 @@ def main(page: ft.Page):
             "location": location,
             "lost_date": date_ref.current.value.strip() or datetime.now().strftime("%Y-%m-%d"),
             "found_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "resolved": False,
+            "resolution_date": None,
         }
         records = records + [rec]
         save()
@@ -158,6 +161,15 @@ def main(page: ft.Page):
         nonlocal records
         records.pop(idx)
         save()
+        refresh()
+
+    def mark_resolved(idx):
+        nonlocal records
+        records[idx]["resolved"] = True
+        records[idx]["resolution_date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        save()
+        page.show_snack_bar(ft.SnackBar(
+            content=ft.Text(f"「{records[idx]['name']}」を見つかりました！"), bgcolor=ft.Colors.GREEN_400))
         refresh()
 
     def show_export_dialog(e):
@@ -343,26 +355,36 @@ def main(page: ft.Page):
                 cat = r.get("category", "")
                 loc = r.get("location", "場所不明")
                 fd = r.get("found_date", "")
+                resolved = r.get("resolved", False)
                 subtitle = f"{loc}  ({fd})"
                 if cat:
                     subtitle = f"[{cat}] {subtitle}"
+                if resolved:
+                    subtitle += "  ✅ 解決済み"
+                trailing_btns = [
+                    ft.IconButton(
+                        ft.Icons.SEARCH, icon_color=ft.Colors.BLUE_300,
+                        tooltip="このアイテムを探す",
+                        on_click=lambda e, n=r["name"]: search_from_history(n),
+                    ),
+                ]
+                if not resolved:
+                    trailing_btns.insert(0, ft.IconButton(
+                        ft.Icons.CHECK_CIRCLE_OUTLINE, icon_color=ft.Colors.GREEN_400,
+                        tooltip="見つかった！",
+                        on_click=lambda e, i=idx: mark_resolved(i),
+                    ))
+                trailing_btns.append(ft.IconButton(
+                    ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_300,
+                    tooltip="削除",
+                    on_click=lambda e, i=idx: delete_record(i),
+                ))
                 hc.append(
                     ft.Card(
                         ft.ListTile(
                             title=ft.Text(r["name"], weight=ft.FontWeight.W_500),
                             subtitle=ft.Text(subtitle, size=13),
-                            trailing=ft.Row([
-                                ft.IconButton(
-                                    ft.Icons.SEARCH, icon_color=ft.Colors.BLUE_300,
-                                    tooltip="このアイテムを探す",
-                                    on_click=lambda e, n=r["name"]: search_from_history(n),
-                                ),
-                                ft.IconButton(
-                                    ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_300,
-                                    tooltip="削除",
-                                    on_click=lambda e, i=idx: delete_record(i),
-                                ),
-                            ], spacing=0),
+                            trailing=ft.Row(trailing_btns, spacing=0),
                         ),
                         margin=3,
                     )
@@ -432,9 +454,6 @@ def main(page: ft.Page):
         cats = [r.get("category", "その他") for r in records]
         top_cat = Counter(cats).most_common(1)[0][0] if cats else "—"
 
-        locs = [r.get("location", "") for r in records if r.get("location")]
-        loc_diversity = len(set(locs)) / total if total > 0 else 0
-
         weekday_counts = Counter()
         for r in records:
             d = r.get("lost_date", "") or r.get("found_date", "")[:10]
@@ -442,11 +461,51 @@ def main(page: ft.Page):
             if wd is not None:
                 weekday_counts[wd] += 1
 
+        peak_wd_name = "—"
         if weekday_counts:
             peak_wd = weekday_counts.most_common(1)[0][0]
             peak_wd_name = WEEKDAYS_JP[peak_wd]
+
+        resolved_list = [r for r in records if r.get("resolved")]
+        resolved_cnt = len(resolved_list)
+        resolution_rate = resolved_cnt / total * 100 if total > 0 else 0
+
+        time_diffs = []
+        for r in resolved_list:
+            ld = r.get("lost_date", "")
+            rd = r.get("resolution_date", "")
+            if ld and rd:
+                try:
+                    lost = datetime.strptime(ld, "%Y-%m-%d")
+                    res = datetime.strptime(rd, "%Y-%m-%d %H:%M")
+                    diff_hours = (res - lost).total_seconds() / 3600
+                    if diff_hours >= 0:
+                        time_diffs.append(diff_hours)
+                except ValueError:
+                    pass
+
+        avg_hours = sum(time_diffs) / len(time_diffs) if time_diffs else None
+
+        advice_lines = []
+        if peak_wd_name != "—":
+            advice_lines.append(f"💡 {peak_wd_name}は特に注意！この曜日によくなくしています")
+        if top_cat != "—":
+            advice_lines.append(f"💡 「{top_cat}」カテゴリの管理を見直してみましょう")
+        if repeat_items:
+            top_repeat = repeat_items[0]
+            advice_lines.append(f"💡 「{top_repeat[0]}」は{top_repeat[1]}回もなくしています！定位置を決めてみては？")
+        if resolution_rate > 50:
+            advice_lines.append(f"✅ 解決率 {resolution_rate:.0f}%！なくしても見つけるのが上手です")
         else:
-            peak_wd_name = "—"
+            advice_lines.append(f"🔍 解決率 {resolution_rate:.0f}%…なくしたらすぐに探す習慣を")
+        if avg_hours is not None:
+            if avg_hours < 24:
+                advice_lines.append(f"⚡ 平均 {avg_hours:.0f}時間で見つけています！素早い！")
+            elif avg_hours < 72:
+                advice_lines.append(f"⏳ 平均 {avg_hours:.0f}時間で発見。1〜2日以内には見つかります")
+            else:
+                days = avg_hours / 24
+                advice_lines.append(f"🐢 平均 {days:.1f}日かかっています。見つけたらすぐ記録しましょう")
 
         lines = []
         lines.append(f"{focus_icon} タイプ: {focus_type}")
@@ -458,9 +517,15 @@ def main(page: ft.Page):
         lines.append(f"📂 よくなくすカテゴリ: {top_cat}")
         if weekday_counts:
             lines.append(f"📅 ピーク曜日: {peak_wd_name}")
+        lines.append(f"✅ 解決率: {resolution_rate:.0f}% ({resolved_cnt}/{total})")
+        if avg_hours is not None:
+            if avg_hours < 24:
+                lines.append(f"⏱ 平均発見時間: {avg_hours:.0f}時間")
+            else:
+                lines.append(f"⏱ 平均発見時間: {avg_hours/24:.1f}日")
 
         title = f"{focus_icon} あなたは「{focus_type}」"
-        return [title] + lines
+        return [title] + lines + [""] + advice_lines
 
     def refresh_analysis():
         analysis_progress.visible = True
@@ -500,11 +565,7 @@ def main(page: ft.Page):
                 ft.Column([
                     ft.Text(diagnosis_lines[0], size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=4),
-                ] + [ft.Text(l, size=13, color=ft.Colors.GREY_700) for l in diagnosis_lines[1:]] +
-                    ([
-                        ft.Divider(height=4),
-                        ft.Text("💡 同じ物を3回以上なくすと診断に反映されます", size=11, color=ft.Colors.GREY_400, italic=True),
-                    ] if not diagnosis_lines[1].startswith("🏆") else []),
+                ] + [ft.Text(l, size=13, color=ft.Colors.GREY_700) for l in diagnosis_lines[1:]],
                     spacing=2,
                 ),
                 padding=12, border_radius=8, bgcolor=ft.Colors.AMBER_50,
@@ -642,10 +703,230 @@ def main(page: ft.Page):
                     margin=3,
                 ))
 
+        sections.append(ft.Divider(height=16))
+        sections.append(ft.Text("なくし物カレンダー", size=18, weight=ft.FontWeight.BOLD))
+        sections.append(ft.Text("日付をタップでその日の記録を表示", size=12, color=ft.Colors.GREY, italic=True))
+        sections.append(ft.Divider(height=8))
+
+        lost_by_date = defaultdict(list)
+        for r in records:
+            d = r.get("lost_date", "") or r.get("found_date", "")[:10]
+            if d:
+                lost_by_date[d].append(r)
+
+        if lost_by_date:
+            all_dates = [datetime.strptime(d, "%Y-%m-%d") for d in lost_by_date if d]
+            min_d = min(all_dates)
+            max_d = max(all_dates)
+        else:
+            min_d = datetime.now()
+            max_d = datetime.now()
+
+        cal_year = getattr(refresh_analysis, "cal_year", max_d.year)
+        cal_month = getattr(refresh_analysis, "cal_month", max_d.month)
+
+        cal_header = ft.Row([
+            ft.IconButton(ft.Icons.NAVIGATE_BEFORE, tooltip="前の月",
+                          on_click=lambda e: _navigate_cal(-1)),
+            ft.Text(f"{cal_year}年 {cal_month}月", size=16, weight=ft.FontWeight.BOLD, expand=True, text_align=ft.TextAlign.CENTER),
+            ft.IconButton(ft.Icons.NAVIGATE_NEXT, tooltip="次の月",
+                          on_click=lambda e: _navigate_cal(1)),
+        ], alignment=ft.MainAxisAlignment.CENTER)
+        sections.append(cal_header)
+
+        cal_grid = ft.Column(spacing=2)
+        month_cal = calendar.monthcalendar(cal_year, cal_month)
+        day_names = ["月", "火", "水", "木", "金", "土", "日"]
+        cal_grid.controls.append(
+            ft.Row([ft.Container(ft.Text(d, size=11, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER),
+                                 width=42, height=24) for d in day_names], spacing=2, alignment=ft.MainAxisAlignment.CENTER)
+        )
+        for week in month_cal:
+            week_row = []
+            for day in week:
+                if day == 0:
+                    week_row.append(ft.Container(width=42, height=42))
+                else:
+                    date_str = f"{cal_year}-{cal_month:02d}-{day:02d}"
+                    day_records = lost_by_date.get(date_str, [])
+                    cnt = len(day_records)
+                    is_today = date_str == datetime.now().strftime("%Y-%m-%d")
+                    bg = ft.Colors.RED_100 if is_today else (ft.Colors.AMBER_50 if cnt > 0 else ft.Colors.GREY_100)
+                    border = ft.border.all(2, ft.Colors.RED_300) if is_today else None
+                    day_text = ft.Text(str(day), size=13, weight=ft.FontWeight.BOLD if cnt > 0 else ft.FontWeight.NORMAL)
+                    badge = None
+                    if cnt > 0:
+                        badge = ft.Container(
+                            content=ft.Text(str(cnt), size=9, color=ft.Colors.WHITE),
+                            bgcolor=ft.Colors.RED_400, border_radius=8,
+                            width=16, height=16,
+                            alignment=ft.Alignment.CENTER,
+                            right=-4, top=-4,
+                        )
+                    stack_items = [day_text]
+                    if badge:
+                        stack_items.append(badge)
+                    stack = ft.Stack(stack_items)
+                    container = ft.Container(
+                        content=stack,
+                        width=42, height=42, bgcolor=bg, border=border,
+                        border_radius=6, alignment=ft.Alignment.CENTER,
+                        ink=True,
+                        on_click=lambda e, ds=date_str, recs=day_records: _show_day_detail(ds, recs),
+                    )
+                    week_row.append(container)
+            cal_grid.controls.append(ft.Row(week_row, spacing=2, alignment=ft.MainAxisAlignment.CENTER))
+        sections.append(cal_grid)
+
+        sections.append(ft.Divider(height=16))
+        sections.append(ft.Text("解決状況分析", size=18, weight=ft.FontWeight.BOLD))
+        sections.append(ft.Divider(height=8))
+
+        resolved_records = [r for r in records if r.get("resolved")]
+        unresolved_records = [r for r in records if not r.get("resolved")]
+        resolved_total = len(resolved_records)
+        unresolved_total = len(unresolved_records)
+        total_recs = len(records)
+        resolved_pct = resolved_total / total_recs * 100 if total_recs > 0 else 0
+
+        sections.append(ft.Row([
+            ft.Container(
+                ft.Column([
+                    ft.Text("解決済み", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(str(resolved_total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.GREEN_50, expand=True,
+            ),
+            ft.Container(
+                ft.Column([
+                    ft.Text("未解決", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(str(unresolved_total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.ORANGE_700),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.ORANGE_50, expand=True,
+            ),
+            ft.Container(
+                ft.Column([
+                    ft.Text("解決率", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(f"{resolved_pct:.0f}%", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_700),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.TEAL_50, expand=True,
+            ),
+        ], spacing=6))
+        sections.append(make_bar(resolved_pct, ft.Colors.GREEN_400))
+        sections.append(ft.Text(f"解決率 {resolved_pct:.0f}%", size=12, color=ft.Colors.GREY_600, italic=True))
+
+        time_diffs = []
+        for r in resolved_records:
+            ld = r.get("lost_date", "")
+            rd = r.get("resolution_date", "")
+            if ld and rd:
+                try:
+                    lost = datetime.strptime(ld, "%Y-%m-%d")
+                    res = datetime.strptime(rd, "%Y-%m-%d %H:%M")
+                    diff_hours = (res - lost).total_seconds() / 3600
+                    if diff_hours >= 0:
+                        time_diffs.append(diff_hours)
+                except ValueError:
+                    pass
+
+        if time_diffs:
+            sections.append(ft.Divider(height=8))
+            avg_h = sum(time_diffs) / len(time_diffs)
+            min_h = min(time_diffs)
+            max_h = max(time_diffs)
+            sections.append(ft.Text("発見までの時間", size=15, weight=ft.FontWeight.BOLD))
+            time_row = ft.Row([
+                ft.Container(
+                    ft.Column([
+                        ft.Text("最短", size=10, color=ft.Colors.GREY_600),
+                        ft.Text(f"{min_h/24:.1f}日" if min_h >= 24 else f"{min_h:.0f}時間",
+                                size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700),
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+                    padding=8, border_radius=8, bgcolor=ft.Colors.GREEN_50, expand=True,
+                ),
+                ft.Container(
+                    ft.Column([
+                        ft.Text("平均", size=10, color=ft.Colors.GREY_600),
+                        ft.Text(f"{avg_h/24:.1f}日" if avg_h >= 24 else f"{avg_h:.0f}時間",
+                                size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700),
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+                    padding=8, border_radius=8, bgcolor=ft.Colors.BLUE_50, expand=True,
+                ),
+                ft.Container(
+                    ft.Column([
+                        ft.Text("最長", size=10, color=ft.Colors.GREY_600),
+                        ft.Text(f"{max_h/24:.1f}日" if max_h >= 24 else f"{max_h:.0f}時間",
+                                size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_700),
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+                    padding=8, border_radius=8, bgcolor=ft.Colors.RED_50, expand=True,
+                ),
+            ], spacing=6)
+            sections.append(time_row)
+
+            bucket = Counter()
+            for h in time_diffs:
+                if h < 1:
+                    bucket["1時間未満"] += 1
+                elif h < 6:
+                    bucket["1〜6時間"] += 1
+                elif h < 24:
+                    bucket["6〜24時間"] += 1
+                elif h < 72:
+                    bucket["1〜3日"] += 1
+                else:
+                    bucket["3日以上"] += 1
+            sections.append(ft.Divider(height=8))
+            sections.append(ft.Text("発見時間の分布", size=14, weight=ft.FontWeight.BOLD))
+            for label, cnt in bucket.most_common():
+                pct = cnt / len(time_diffs) * 100
+                sections.append(ft.Column([
+                    ft.Row([
+                        ft.Text(label, size=12, expand=True),
+                        ft.Text(f"{cnt}件", size=11, color=ft.Colors.GREY_600),
+                    ]),
+                    make_bar(pct, ft.Colors.BLUE_300),
+                ], spacing=1))
+
         analysis_container.controls = sections
         analysis_progress.visible = False
         analysis_container.update()
         analysis_progress.update()
+
+    def _navigate_cal(delta):
+        cy = getattr(refresh_analysis, "cal_year", datetime.now().year)
+        cm = getattr(refresh_analysis, "cal_month", datetime.now().month)
+        cm += delta
+        if cm > 12:
+            cm = 1
+            cy += 1
+        elif cm < 1:
+            cm = 12
+            cy -= 1
+        refresh_analysis.cal_year = cy
+        refresh_analysis.cal_month = cm
+        refresh_analysis()
+
+    def _show_day_detail(date_str, day_records):
+        if not day_records:
+            page.show_snack_bar(ft.SnackBar(content=ft.Text(f"{date_str} の記録はありません")))
+            return
+        items_text = "\n".join(
+            f"• {r['name']} ({r.get('location', '場所不明')})"
+            for r in day_records
+        )
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(f"{date_str} になくした物"),
+            content=ft.Column([
+                ft.Text(f"{len(day_records)}件の記録", size=13, color=ft.Colors.GREY_600),
+                ft.Text(items_text, size=13),
+            ], tight=True, spacing=8),
+            actions=[ft.TextButton("閉じる", on_click=lambda e: setattr(dlg, 'open', False) or dlg.update())],
+        )
+        page.show_dialog(dlg)
 
     search_dropdown = ft.Dropdown(
         ref=search_dropdown_ref,
