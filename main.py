@@ -65,17 +65,29 @@ def main(page: ft.Page):
     def load_from_storage():
         nonlocal records
         try:
-            raw = page.client_storage.get(STORAGE_KEY)
-            if raw and isinstance(raw, list):
-                records = raw
+            from js import window
+            raw = window.localStorage.getItem(STORAGE_KEY)
+            if raw is not None:
+                data = json.loads(raw)
+                if isinstance(data, list):
+                    records = data
         except Exception:
-            pass
+            try:
+                raw = page.client_storage.get(STORAGE_KEY)
+                if raw and isinstance(raw, list):
+                    records = raw
+            except Exception:
+                pass
 
     def save():
         try:
-            page.client_storage.set(STORAGE_KEY, records)
+            from js import window
+            window.localStorage.setItem(STORAGE_KEY, json.dumps(records, ensure_ascii=False))
         except Exception:
-            pass
+            try:
+                page.client_storage.set(STORAGE_KEY, records)
+            except Exception:
+                pass
 
     def get_filtered():
         nonlocal search_cat
