@@ -715,10 +715,10 @@ def main(page: ft.Page):
         content=ft.Column([
             ft.TabBar(
                 tabs=[
-                    ft.Tab(text="探す", icon=ft.Icons.SEARCH),
-                    ft.Tab(text="記録", icon=ft.Icons.ADD_CIRCLE_OUTLINE),
-                    ft.Tab(text="ランキング", icon=ft.Icons.EMOJI_EVENTS),
-                    ft.Tab(text="分析", icon=ft.Icons.ANALYTICS),
+                    ft.Tab(label="探す", icon=ft.Icons.SEARCH),
+                    ft.Tab(label="記録", icon=ft.Icons.ADD_CIRCLE_OUTLINE),
+                    ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
+                    ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
                 ],
             ),
             ft.TabBarView(
