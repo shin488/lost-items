@@ -397,31 +397,29 @@ def main(page: ft.Page):
     root_tabs = ft.Tabs(
         selected_index=0,
         on_change=on_tab_change,
-        length=3,
+        tabs=[
+            ft.Tab(
+                text="探す",
+                icon=ft.Icons.SEARCH,
+                content=ft.Container(content=tab_search, padding=10),
+            ),
+            ft.Tab(
+                text="記録",
+                icon=ft.Icons.ADD_CIRCLE,
+                content=ft.Container(content=tab_record, padding=10),
+            ),
+            ft.Tab(
+                text="ランキング",
+                icon=ft.Icons.EMOJI_EVENTS,
+                content=ft.Container(content=tab_ranking, padding=10),
+            ),
+        ],
         expand=True,
-        content=ft.Column(
-            expand=True, spacing=0,
-            controls=[
-                ft.TabBar(tabs=[
-                    ft.Tab(label="探す", icon=ft.Icons.SEARCH),
-                    ft.Tab(label="記録", icon=ft.Icons.ADD_CIRCLE),
-                    ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
-                ]),
-                ft.TabBarView(expand=True, controls=[
-                    ft.Container(content=tab_search, padding=10),
-                    ft.Container(content=tab_record, padding=10),
-                    ft.Container(content=tab_ranking, padding=10),
-                ]),
-            ],
-        ),
     )
 
     load_from_storage()
 
-    if not records:
-        page.add(empty_content)
-    else:
-        page.add(root_tabs)
+    page.add(root_tabs)
 
     page.update()
     refresh()
