@@ -1142,7 +1142,7 @@ def main(page: ft.Page):
     )
 
     page.overlay.append(date_picker)
-    page.add(ft.Container(ft.SafeArea(tabs), bgcolor=ft.Colors.GREEN_50, expand=True))
+    page.add(ft.SafeArea(tabs))
 
     page.update()
     load_from_storage()
