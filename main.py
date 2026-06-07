@@ -35,7 +35,7 @@ def main(page: ft.Page):
             secondary=ft.Colors.TEAL,
             secondary_container=ft.Colors.TEAL_100,
             surface=ft.Colors.GREY_50,
-            surface_variant=ft.Colors.GREY_100,
+            surface_container=ft.Colors.GREY_100,
         ),
         use_material3=True,
     )
@@ -637,7 +637,7 @@ def main(page: ft.Page):
                         width=28, height=28,
                         bgcolor=ft.Colors.RED_400 if is_best else (ft.Colors.BLUE_300 if is_active else ft.Colors.GREY_200),
                         border_radius=14,
-                        alignment=ft.alignment.center,
+                        alignment=ft.Alignment.CENTER,
                     ))
                 sections.append(ft.Card(
                     ft.ListTile(
