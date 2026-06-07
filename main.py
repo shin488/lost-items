@@ -27,44 +27,39 @@ def parse_weekday(d: str):
 
 def main(page: ft.Page):
     page.title = "なくしもの探知機"
-    page.theme_mode = ft.ThemeMode.LIGHT
-    page.padding = 20
-    page.scroll = ft.ScrollMode.AUTO
 
+    page.theme = ft.Theme(
+        color_scheme=ft.ColorScheme(
+            primary=ft.Colors.DEEP_PURPLE,
+            primary_container=ft.Colors.DEEP_PURPLE_100,
+            secondary=ft.Colors.TEAL,
+            secondary_container=ft.Colors.TEAL_100,
+            surface=ft.Colors.GREY_50,
+            surface_variant=ft.Colors.GREY_100,
+        ),
+        use_material3=True,
+    )
+
+    page.scroll = ft.ScrollMode.AUTO
     records = []
-    current_tab = 0
     search_val = ""
     search_cat = ""
     results = None
 
-    search_dropdown = ft.Dropdown(
-        label="カテゴリで絞り込み",
-        options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
-        width=300,
-    )
-    search_field = ft.TextField(
-        label="なくした物は？", hint_text="例: 財布、鍵、スマホ", expand=True,
-    )
+    search_ref = ft.Ref[ft.TextField]()
+    name_ref = ft.Ref[ft.TextField]()
+    date_ref = ft.Ref[ft.TextField]()
+    location_ref = ft.Ref[ft.TextField]()
+    category_ref = ft.Ref[ft.Dropdown]()
+    search_dropdown_ref = ft.Ref[ft.Dropdown]()
+
     chips_container = ft.Column(spacing=4)
     results_container = ft.Column(spacing=6)
-    name_field = ft.TextField(
-        label="なくした物", hint_text="例: 鍵、スマホ、財布", width=300,
-    )
-    category_dropdown = ft.Dropdown(
-        label="カテゴリ",
-        options=([ft.dropdown.Option("", "選択してください")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
-        width=300,
-    )
-    date_field = ft.TextField(
-        label="なくした日 (任意)", hint_text="YYYY-MM-DD", width=300,
-    )
-    location_field = ft.TextField(
-        label="見つかった場所", hint_text="例: ソファの隙間", width=300,
-    )
     simulation_container = ft.Column(spacing=4)
     history_container = ft.Column(spacing=4)
     ranking_container = ft.Column(spacing=8)
     analysis_container = ft.Column(spacing=8)
+    analysis_progress = ft.ProgressBar(visible=False)
 
     def load_from_storage():
         nonlocal records
@@ -82,6 +77,7 @@ def main(page: ft.Page):
             pass
 
     def get_filtered():
+        nonlocal search_cat
         if not search_cat:
             return records
         return [r for r in records if r.get("category", "") == search_cat]
@@ -99,16 +95,22 @@ def main(page: ft.Page):
                 for loc, cnt in location_counts]
 
     def search_from_history(name):
-        nonlocal search_val, results, current_tab
+        nonlocal search_val, results
         search_val = name
-        search_field.value = name
+        search_ref.current.value = name
         results = do_search(name)
-        switch_tab(0)
+        tabs.selected_index = 0
+        tabs.update()
         refresh()
+
+    def on_tab_change(e):
+        idx = int(e.data)
+        if idx == 3:
+            refresh_analysis()
 
     def on_search_click(e):
         nonlocal results
-        q = search_field.value.strip()
+        q = search_ref.current.value.strip()
         if not q:
             e.page.show_snack_bar(ft.SnackBar(content=ft.Text("なくした物を入力してください")))
             results = []
@@ -126,8 +128,8 @@ def main(page: ft.Page):
 
     def on_add_record(e):
         nonlocal records
-        name = name_field.value.strip()
-        location = location_field.value.strip()
+        name = name_ref.current.value.strip()
+        location = location_ref.current.value.strip()
         if not name:
             e.page.show_snack_bar(ft.SnackBar(
                 content=ft.Text("「なくした物」を入力してください"), bgcolor=ft.Colors.RED_400))
@@ -138,18 +140,18 @@ def main(page: ft.Page):
             return
         rec = {
             "name": name,
-            "category": category_dropdown.value or "その他",
+            "category": category_ref.current.value or "その他",
             "location": location,
-            "lost_date": date_field.value.strip() or datetime.now().strftime("%Y-%m-%d"),
+            "lost_date": date_ref.current.value.strip() or datetime.now().strftime("%Y-%m-%d"),
             "found_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         }
         records = records + [rec]
         save()
         e.page.show_snack_bar(ft.SnackBar(content=ft.Text("記録しました"), bgcolor=ft.Colors.GREEN_400))
-        name_field.value = ""
-        category_dropdown.value = ""
-        date_field.value = ""
-        location_field.value = ""
+        name_ref.current.value = ""
+        category_ref.current.value = ""
+        date_ref.current.value = ""
+        location_ref.current.value = ""
         refresh()
 
     def delete_record(idx):
@@ -164,6 +166,7 @@ def main(page: ft.Page):
             value=data, multiline=True, min_lines=10, max_lines=20,
             width=500, read_only=True,
         )
+
         dlg = ft.AlertDialog(
             modal=True,
             title=ft.Text("データをエクスポート"),
@@ -267,7 +270,7 @@ def main(page: ft.Page):
             chip = ft.Container(
                 content=ft.Text(name, size=13),
                 padding=8,
-                bgcolor=ft.Colors.BLUE_50,
+                bgcolor=ft.Colors.DEEP_PURPLE_50,
                 border_radius=12,
                 on_click=lambda e, n=name: search_from_history(n),
                 ink=True,
@@ -291,7 +294,7 @@ def main(page: ft.Page):
                 ft.Divider(height=8),
             ]
             for loc, cnt, pct, is_top in results:
-                color = ft.Colors.ORANGE_400 if is_top else ft.Colors.BLUE_400
+                color = ft.Colors.DEEP_ORANGE_400 if is_top else ft.Colors.INDIGO_400
                 rc.append(ft.Column([
                     ft.Row([
                         ft.Text("👑 " if is_top else "", size=14),
@@ -317,7 +320,7 @@ def main(page: ft.Page):
                     ft.Divider(height=4),
                 ]
                 for loc, sc, pct, is_top in sim_results:
-                    color = ft.Colors.GREEN_400 if is_top else ft.Colors.BLUE_300
+                    color = ft.Colors.TEAL_400 if is_top else ft.Colors.BLUE_300
                     sim.append(ft.Column([
                         ft.Row([
                             ft.Text("🔍 " if is_top else "  ", size=14),
@@ -466,11 +469,14 @@ def main(page: ft.Page):
         return [title] + lines
 
     def refresh_analysis():
-        nonlocal analysis_container
+        analysis_progress.visible = True
+        analysis_progress.update()
 
         if not records:
             analysis_container.controls = [ft.Text("まだデータがありません", italic=True, color=ft.Colors.GREY)]
+            analysis_progress.visible = False
             analysis_container.update()
+            analysis_progress.update()
             return
 
         items = [r["name"] for r in records]
@@ -517,18 +523,18 @@ def main(page: ft.Page):
             ft.Container(
                 ft.Column([
                     ft.Text("総記録数", size=11, color=ft.Colors.GREY_600),
-                    ft.Text(str(total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700),
+                    ft.Text(str(total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.DEEP_PURPLE_700),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.BLUE_50, expand=True,
+                bgcolor=ft.Colors.DEEP_PURPLE_50, expand=True,
             ),
             ft.Container(
                 ft.Column([
                     ft.Text("なくした物", size=11, color=ft.Colors.GREY_600),
-                    ft.Text(str(unique_items), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700),
+                    ft.Text(str(unique_items), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_700),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.GREEN_50, expand=True,
+                bgcolor=ft.Colors.TEAL_50, expand=True,
             ),
             ft.Container(
                 ft.Column([
@@ -560,7 +566,7 @@ def main(page: ft.Page):
                 cnt = weekday_total.get(wd_idx, 0)
                 pct = cnt / total * 100
                 is_top_wd = wd_idx == best_wd
-                color = ft.Colors.RED_400 if is_top_wd else ft.Colors.PURPLE_300
+                color = ft.Colors.RED_400 if is_top_wd else ft.Colors.DEEP_PURPLE_300
                 items_on_day = weekday_item[wd_idx].most_common(3)
                 items_str = "  ".join(f"{n}({c})" for n, c in items_on_day) if items_on_day else "—"
                 sections.append(ft.Column([
@@ -590,7 +596,7 @@ def main(page: ft.Page):
                 loc_chips.append(ft.Container(
                     content=ft.Text(f"{loc} ({lc}回)", size=12),
                     padding=8,
-                    bgcolor=ft.Colors.GREEN_50,
+                    bgcolor=ft.Colors.TEAL_50,
                     border_radius=8,
                 ))
             sections.append(ft.Card(
@@ -643,85 +649,101 @@ def main(page: ft.Page):
                 ))
 
         analysis_container.controls = sections
+        analysis_progress.visible = False
         analysis_container.update()
+        analysis_progress.update()
 
-    def switch_tab(idx):
-        nonlocal current_tab
-        old = current_tab
-        current_tab = idx
-        for j, btn in enumerate(tab_buttons):
-            btn.bgcolor = ft.Colors.BLUE_50 if j == idx else ft.Colors.WHITE
-        tab_buttons[old].update()
-        tab_buttons[idx].update()
-        content_area.controls = [tab_views[idx]]
-        content_area.update()
-        if idx == 3:
-            refresh_analysis()
+    search_dropdown = ft.Dropdown(
+        ref=search_dropdown_ref,
+        label="カテゴリで絞り込み",
+        options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
+        width=300,
+        on_change=on_search_cat_change,
+    )
 
-    search_dropdown.on_change = on_search_cat_change
-    search_field.on_change = lambda e: setattr(search_field, 'value', e.control.value)
-    name_field.on_change = lambda e: setattr(name_field, 'value', e.control.value)
-    category_dropdown.on_change = lambda e: setattr(category_dropdown, 'value', e.control.value)
-    date_field.on_change = lambda e: setattr(date_field, 'value', e.control.value)
-    location_field.on_change = lambda e: setattr(location_field, 'value', e.control.value)
+    search_view = ft.Column([
+        ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
+        ft.Divider(height=8),
+        search_dropdown,
+        ft.Row([
+            ft.TextField(ref=search_ref, label="なくした物は？", hint_text="例: 財布、鍵、スマホ", expand=True),
+            ft.ElevatedButton("探す", on_click=on_search_click, icon=ft.Icons.SEARCH),
+        ]),
+        chips_container,
+        ft.Divider(height=8),
+        results_container,
+        ft.Divider(height=8),
+        simulation_container,
+    ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    tab_views = [
-        ft.Column([
-            ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
-            ft.Divider(height=8),
-            search_dropdown,
-            ft.Row([search_field, ft.ElevatedButton("探す", on_click=on_search_click, icon=ft.Icons.SEARCH)]),
-            chips_container,
-            ft.Divider(height=8),
-            results_container,
-            ft.Divider(height=8),
-            simulation_container,
-        ], scroll=ft.ScrollMode.AUTO, spacing=12),
-        ft.Column([
-            ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD),
-            ft.Divider(height=8),
-            name_field,
-            category_dropdown,
-            date_field,
-            location_field,
-            ft.ElevatedButton("記録する", on_click=on_add_record, icon=ft.Icons.ADD),
-            ft.Divider(height=16),
+    record_view = ft.Column([
+        ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD),
+        ft.Divider(height=8),
+        ft.TextField(ref=name_ref, label="なくした物", hint_text="例: 鍵、スマホ、財布", width=300),
+        ft.Dropdown(
+            ref=category_ref,
+            label="カテゴリ",
+            options=([ft.dropdown.Option("", "選択してください")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
+            width=300,
+        ),
+        ft.TextField(ref=date_ref, label="なくした日 (任意)", hint_text="YYYY-MM-DD", width=300),
+        ft.TextField(ref=location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
+        ft.ElevatedButton("記録する", on_click=on_add_record, icon=ft.Icons.ADD),
+        ft.Divider(height=16),
+        ft.Row([
+            ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
             ft.Row([
-                ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
-                ft.Row([
-                    ft.TextButton("エクスポート", on_click=show_export_dialog),
-                    ft.TextButton("インポート", on_click=show_import_dialog),
-                ]),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            history_container,
-        ], scroll=ft.ScrollMode.AUTO, spacing=12),
-        ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12),
-        ft.Column([analysis_container], scroll=ft.ScrollMode.AUTO, spacing=12),
-    ]
+                ft.TextButton("エクスポート", on_click=show_export_dialog),
+                ft.TextButton("インポート", on_click=show_import_dialog),
+            ]),
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        history_container,
+    ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    tab_labels = ["探す", "記録", "ランキング", "分析"]
-    tab_buttons = []
-    for i, label in enumerate(tab_labels):
-        btn = ft.Container(
-            content=ft.Column([
-                ft.Text(label, size=12, weight=ft.FontWeight.BOLD),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=12,
-            expand=True,
-            bgcolor=ft.Colors.BLUE_50 if i == 0 else ft.Colors.WHITE,
-            border_radius=0,
-            ink=True,
-        )
-        btn.on_click = lambda e, idx=i: switch_tab(idx)
-        tab_buttons.append(btn)
+    ranking_view = ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    tab_bar = ft.Row(tab_buttons, spacing=0, tight=True)
-    tab_bar_divider = ft.Divider(height=1, color=ft.Colors.BLUE_200)
-    content_area = ft.Column([tab_views[0]], expand=True)
+    analysis_view = ft.Column([
+        analysis_progress,
+        analysis_container,
+    ], scroll=ft.ScrollMode.AUTO, spacing=12)
+
+    tabs = ft.Tabs(
+        selected_index=0,
+        length=4,
+        expand=True,
+        on_change=on_tab_change,
+        content=ft.Column([
+            ft.TabBar(
+                tabs=[
+                    ft.Tab(text="探す", icon=ft.Icons.SEARCH),
+                    ft.Tab(text="記録", icon=ft.Icons.ADD_CIRCLE_OUTLINE),
+                    ft.Tab(text="ランキング", icon=ft.Icons.EMOJI_EVENTS),
+                    ft.Tab(text="分析", icon=ft.Icons.ANALYTICS),
+                ],
+            ),
+            ft.TabBarView(
+                expand=True,
+                controls=[search_view, record_view, ranking_view, analysis_view],
+            ),
+        ]),
+    )
+
+    page.appbar = ft.AppBar(
+        title=ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD),
+        bgcolor=ft.Colors.DEEP_PURPLE,
+        color=ft.Colors.WHITE,
+        center_title=True,
+        actions=[
+            ft.IconButton(ft.Icons.FILE_DOWNLOAD, icon_color=ft.Colors.WHITE,
+                          tooltip="エクスポート", on_click=show_export_dialog),
+            ft.IconButton(ft.Icons.FILE_UPLOAD, icon_color=ft.Colors.WHITE,
+                          tooltip="インポート", on_click=show_import_dialog),
+        ],
+    )
 
     load_from_storage()
 
-    page.add(tab_bar, tab_bar_divider, content_area)
+    page.add(ft.SafeArea(tabs))
 
     page.update()
     refresh()
