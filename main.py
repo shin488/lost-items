@@ -112,15 +112,12 @@ def main(page: ft.Page):
         search_val = name
         search_ref.current.value = name
         results = do_search(name)
-        nav_bar.selected_index = 0
-        nav_bar.update()
-        view_stack.controls = [views[0]]
-        view_stack.update()
+        tabs.selected_index = 0
+        tabs.update()
         refresh()
 
-    def show_page(idx):
-        view_stack.controls = [views[idx]]
-        view_stack.update()
+    def on_tab_change(e):
+        idx = int(e.data)
         if idx == 3:
             refresh_analysis()
 
@@ -408,20 +405,13 @@ def main(page: ft.Page):
                     on_click=lambda e, i=idx: delete_record(i),
                 ))
                 hc.append(
-                    ft.Dismissible(
-                        content=ft.Card(
-                            ft.ListTile(
-                                title=ft.Text(r["name"], weight=ft.FontWeight.W_500),
-                                subtitle=ft.Text(subtitle, size=13),
-                                trailing=ft.Row(trailing_btns, spacing=0),
-                            ),
-                            margin=3, elevation=2,
+                    ft.Card(
+                        ft.ListTile(
+                            title=ft.Text(r["name"], weight=ft.FontWeight.W_500),
+                            subtitle=ft.Text(subtitle, size=13),
+                            trailing=ft.Row(trailing_btns, spacing=0),
                         ),
-                        background=ft.Container(bgcolor=ft.Colors.RED_400,
-                            content=ft.Row([ft.Text("削除", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)], alignment=ft.MainAxisAlignment.END),
-                            padding=ft.padding.only(right=20), alignment=ft.Alignment.CENTER_RIGHT),
-                        dismiss_direction=ft.DismissDirection.END_TO_START,
-                        on_dismiss=lambda e, i=idx: delete_record(i),
+                        margin=3, elevation=2,
                     )
                 )
             history_container.controls = hc
@@ -1039,18 +1029,25 @@ def main(page: ft.Page):
         analysis_container,
     ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    views = [search_view, record_view, ranking_view, analysis_view]
-    view_stack = ft.Column(controls=[views[0]], expand=True)
-
-    nav_bar = ft.NavigationBar(
+    tabs = ft.Tabs(
         selected_index=0,
-        destinations=[
-            ft.NavigationDestination(icon=ft.Icons.SEARCH, label="探す"),
-            ft.NavigationDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, label="記録"),
-            ft.NavigationDestination(icon=ft.Icons.EMOJI_EVENTS, label="ランキング"),
-            ft.NavigationDestination(icon=ft.Icons.ANALYTICS, label="分析"),
-        ],
-        on_change=lambda e: show_page(int(e.data)),
+        length=4,
+        expand=True,
+        on_change=on_tab_change,
+        content=ft.Column([
+            ft.TabBar(
+                tabs=[
+                    ft.Tab(label="探す", icon=ft.Icons.SEARCH),
+                    ft.Tab(label="記録", icon=ft.Icons.ADD_CIRCLE_OUTLINE),
+                    ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
+                    ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
+                ],
+            ),
+            ft.TabBarView(
+                expand=True,
+                controls=[search_view, record_view, ranking_view, analysis_view],
+            ),
+        ]),
     )
 
     page.appbar = ft.AppBar(
@@ -1067,7 +1064,7 @@ def main(page: ft.Page):
     )
 
     page.overlay.append(date_picker)
-    page.add(ft.SafeArea(ft.Column([view_stack, nav_bar], spacing=0, expand=True)))
+    page.add(ft.SafeArea(tabs))
 
     page.update()
     load_from_storage()
