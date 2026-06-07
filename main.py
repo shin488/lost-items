@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 from collections import Counter, defaultdict
 import json
@@ -9,7 +8,6 @@ import flet as ft
 STORAGE_KEY = "lost_items_v4"
 CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
 WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
-ANIM_DURATION = 600
 
 
 def fuzzy_match(query: str, text: str) -> bool:
@@ -18,11 +16,10 @@ def fuzzy_match(query: str, text: str) -> bool:
     return bool(q) and (q in t)
 
 
-def parse_weekday(d: str) -> int | None:
+def parse_weekday(d: str):
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m-%d", "%m/%d"):
         try:
-            dt = datetime.strptime(d, fmt)
-            return dt.weekday()
+            return datetime.strptime(d, fmt).weekday()
         except ValueError:
             pass
     return None
@@ -39,11 +36,6 @@ def main(page: ft.Page):
     search_val = ""
     search_cat = ""
     results = None
-    record_name = ""
-    record_cat = ""
-    record_date = ""
-    record_loc = ""
-    anim_tasks = []
 
     search_dropdown = ft.Dropdown(
         label="カテゴリで絞り込み",
@@ -132,7 +124,7 @@ def main(page: ft.Page):
         refresh()
 
     def on_add_record(e):
-        nonlocal records, record_name, record_cat, record_date, record_loc
+        nonlocal records
         name = name_field.value.strip()
         location = location_field.value.strip()
         if not name:
@@ -228,33 +220,20 @@ def main(page: ft.Page):
         )
         e.page.show_dialog(dlg)
 
-    async def animate_bar(bar, pct_text, pct, color, delay):
-        await asyncio.sleep(delay)
-        bar.width = f"{pct}%"
-        bar.update()
-        for i in range(1, int(pct) + 1):
-            pct_text.value = f"{i}%"
-            pct_text.color = color if i > 30 else ft.Colors.GREY_500
-            pct_text.update()
-            await asyncio.sleep(6 / 1000)
-        pct_text.value = f"{pct:.0f}%"
-        pct_text.color = color
-        pct_text.weight = ft.FontWeight.BOLD
-        pct_text.update()
+    def make_bar(pct, color):
+        inner = ft.Container(height=12, width=f"{pct}%", bgcolor=color, border_radius=6)
+        outer = ft.Container(height=12, bgcolor=ft.Colors.GREY_200, border_radius=6)
+        return ft.Stack([outer, inner])
 
     def refresh():
-        nonlocal chips_container, results_container, history_container, ranking_container, anim_tasks
-
-        for t in anim_tasks:
-            t.cancel()
-        anim_tasks = []
+        nonlocal chips_container, results_container, history_container, ranking_container
 
         chips = []
         unique = list(dict.fromkeys(r["name"] for r in get_filtered()))
         for name in unique:
             chip = ft.Container(
                 content=ft.Text(name, size=13),
-                padding=ft.Padding(8, 4, 8, 4),
+                padding=8,
                 bgcolor=ft.Colors.BLUE_50,
                 border_radius=12,
                 on_click=lambda e, n=name: search_from_history(n),
@@ -276,36 +255,18 @@ def main(page: ft.Page):
                         size=12, color=ft.Colors.GREY, italic=True),
                 ft.Divider(height=8),
             ]
-            for i, (loc, cnt, pct, is_top) in enumerate(results):
-                bar = ft.Container(
-                    height=14,
-                    bgcolor=ft.Colors.ORANGE_400 if is_top else ft.Colors.BLUE_400,
-                    border_radius=7,
-                    animate=ft.Animation(ANIM_DURATION, ft.AnimationCurve.EASE_OUT),
-                )
-                pct_text = ft.Text("0%", size=12, weight=ft.FontWeight.NORMAL, color=ft.Colors.GREY_500)
+            for loc, cnt, pct, is_top in results:
+                color = ft.Colors.ORANGE_400 if is_top else ft.Colors.BLUE_400
                 rc.append(ft.Column([
                     ft.Row([
-                        ft.Row([
-                            ft.Text("👑 " if is_top else "", size=14),
-                            ft.Text(loc, size=15, weight=(
-                                ft.FontWeight.BOLD if is_top else ft.FontWeight.NORMAL), expand=True),
-                        ], spacing=0),
-                        pct_text,
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Stack([
-                        ft.Container(height=14, bgcolor=ft.Colors.GREY_200, border_radius=7),
-                        bar,
+                        ft.Text("👑 " if is_top else "", size=14),
+                        ft.Text(loc, size=15, weight=(
+                            ft.FontWeight.BOLD if is_top else ft.FontWeight.NORMAL), expand=True),
+                        ft.Text(f"{pct:.0f}%", size=14, weight=ft.FontWeight.BOLD, color=color),
                     ]),
+                    make_bar(pct, color),
                     ft.Text(f"{cnt}件", size=11, color=ft.Colors.GREY_600),
                 ], spacing=2))
-                delay = i * 150
-                task = asyncio.ensure_future(animate_bar(
-                    bar, pct_text, pct,
-                    ft.Colors.ORANGE_400 if is_top else ft.Colors.BLUE_400,
-                    delay / 1000
-                ))
-                anim_tasks.append(task)
             results_container.controls = rc
 
         if not records:
@@ -397,8 +358,6 @@ def main(page: ft.Page):
         locations = Counter(r["location"] for r in records).most_common(1)
         top_loc = locations[0] if locations else ("", 0)
 
-        loc_counts = Counter(r["location"] for r in records).most_common(5)
-
         weekday_item = defaultdict(lambda: Counter())
         weekday_total = Counter()
         for r in records:
@@ -415,77 +374,65 @@ def main(page: ft.Page):
 
         sections.append(ft.Text("全体統計", size=18, weight=ft.FontWeight.BOLD))
         sections.append(ft.Divider(height=8))
-        stats_cards = ft.ResponsiveRow([
-            ft.Card(ft.Container(
+        row1 = ft.Row([
+            ft.Container(
                 ft.Column([
-                    ft.Text("総記録数", size=12, color=ft.Colors.GREY_600),
-                    ft.Text(str(total), size=28, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
-                padding=15, alignment=ft.alignment.center,
-            ), col={"sm": 6, "md": 3}, margin=3),
-            ft.Card(ft.Container(
+                    ft.Text("総記録数", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(str(total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.BLUE_50, expand=True,
+            ),
+            ft.Container(
                 ft.Column([
-                    ft.Text("なくした物", size=12, color=ft.Colors.GREY_600),
-                    ft.Text(str(unique_items), size=28, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
-                padding=15, alignment=ft.alignment.center,
-            ), col={"sm": 6, "md": 3}, margin=3),
-            ft.Card(ft.Container(
+                    ft.Text("なくした物", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(str(unique_items), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.GREEN_50, expand=True,
+            ),
+            ft.Container(
                 ft.Column([
-                    ft.Text("最多なくし物", size=12, color=ft.Colors.GREY_600),
-                    ft.Text(top_item[0], size=18, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"{top_item[1]}回", size=13, color=ft.Colors.GREY_600),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
-                padding=15, alignment=ft.alignment.center,
-            ), col={"sm": 6, "md": 3}, margin=3),
-            ft.Card(ft.Container(
+                    ft.Text("最多なくし物", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(top_item[0], size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"{top_item[1]}回", size=11, color=ft.Colors.GREY_600),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.ORANGE_50, expand=True,
+            ),
+            ft.Container(
                 ft.Column([
-                    ft.Text("最多発見場所", size=12, color=ft.Colors.GREY_600),
-                    ft.Text(top_loc[0], size=18, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"{top_loc[1]}回", size=13, color=ft.Colors.GREY_600),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
-                padding=15, alignment=ft.alignment.center,
-            ), col={"sm": 6, "md": 3}, margin=3),
-        ])
-        sections.append(stats_cards)
+                    ft.Text("最多発見場所", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(top_loc[0], size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"{top_loc[1]}回", size=11, color=ft.Colors.GREY_600),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                padding=10, border_radius=8,
+                bgcolor=ft.Colors.PURPLE_50, expand=True,
+            ),
+        ], spacing=6)
+        sections.append(row1)
 
         if has_weekday:
             sections.append(ft.Divider(height=16))
             sections.append(ft.Text("なくしやすい曜日", size=18, weight=ft.FontWeight.BOLD))
             sections.append(ft.Divider(height=8))
 
-            max_wd = max(c for _, c in weekday_total.most_common()) if weekday_total else 1
             for wd_idx in range(7):
                 cnt = weekday_total.get(wd_idx, 0)
                 pct = cnt / total * 100
                 is_top_wd = wd_idx == best_wd
-                bar = ft.Container(
-                    height=14,
-                    bgcolor=ft.Colors.RED_400 if is_top_wd else ft.Colors.PURPLE_300,
-                    border_radius=7,
-                    animate=ft.Animation(ANIM_DURATION, ft.AnimationCurve.EASE_OUT),
-                )
+                color = ft.Colors.RED_400 if is_top_wd else ft.Colors.PURPLE_300
                 items_on_day = weekday_item[wd_idx].most_common(3)
                 items_str = "  ".join(f"{n}({c})" for n, c in items_on_day) if items_on_day else "—"
-                pct_text = ft.Text(str(cnt), size=12, weight=ft.FontWeight.BOLD)
                 sections.append(ft.Column([
                     ft.Row([
                         ft.Text(f"{WEEKDAYS_JP[wd_idx]}", size=14, weight=(
                             ft.FontWeight.BOLD if is_top_wd else ft.FontWeight.NORMAL), expand=True),
-                        pct_text,
+                        ft.Text(f"{cnt}回", size=12, weight=ft.FontWeight.BOLD),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Stack([
-                        ft.Container(height=14, bgcolor=ft.Colors.GREY_200, border_radius=7),
-                        bar,
-                    ]),
+                    make_bar(pct, color),
                     ft.Text(items_str, size=11, color=ft.Colors.GREY_600, italic=True),
                 ], spacing=2))
-                delay = wd_idx * 80
-                asyncio.ensure_future(animate_bar(
-                    bar, pct_text, pct,
-                    ft.Colors.RED_400 if is_top_wd else ft.Colors.PURPLE_300,
-                    delay / 1000
-                ))
 
         sections.append(ft.Divider(height=16))
         sections.append(ft.Text("アイテム × 場所 の相関", size=18, weight=ft.FontWeight.BOLD))
@@ -503,7 +450,7 @@ def main(page: ft.Page):
             for loc, lc in top_locs:
                 loc_chips.append(ft.Container(
                     content=ft.Text(f"{loc} ({lc}回)", size=12),
-                    padding=ft.Padding(8, 3, 8, 3),
+                    padding=8,
                     bgcolor=ft.Colors.GREEN_50,
                     border_radius=8,
                 ))
@@ -540,12 +487,12 @@ def main(page: ft.Page):
                     is_active = wc > 0
                     is_best = wd_idx == top_wd[0]
                     wd_dots.append(ft.Container(
-                        content=ft.Text(WEEKDAYS_JP[wd_idx][0], size=10, color=ft.Colors.WHITE if is_active else ft.Colors.GREY_400),
+                        content=ft.Text(WEEKDAYS_JP[wd_idx][0], size=10,
+                                       color=ft.Colors.WHITE if is_active else ft.Colors.GREY_400),
                         width=28, height=28,
                         bgcolor=ft.Colors.RED_400 if is_best else (ft.Colors.BLUE_300 if is_active else ft.Colors.GREY_200),
                         border_radius=14,
                         alignment=ft.alignment.center,
-                        tooltip=f"{WEEKDAYS_JP[wd_idx]}: {wc}回" if is_active else "",
                     ))
                 sections.append(ft.Card(
                     ft.ListTile(
@@ -558,75 +505,6 @@ def main(page: ft.Page):
 
         analysis_container.controls = sections
         analysis_container.update()
-
-    search_dropdown.on_change = on_search_cat_change
-    search_field.on_change = lambda e: setattr(search_field, 'value', e.control.value)
-    name_field.on_change = lambda e: setattr(name_field, 'value', e.control.value)
-    category_dropdown.on_change = lambda e: setattr(category_dropdown, 'value', e.control.value)
-    date_field.on_change = lambda e: setattr(date_field, 'value', e.control.value)
-    location_field.on_change = lambda e: setattr(location_field, 'value', e.control.value)
-
-    tab_views = [
-        ft.Column([
-            ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
-            ft.Divider(height=8),
-            search_dropdown,
-            ft.Row([search_field, ft.Button("探す", on_click=on_search_click, icon=ft.Icons.SEARCH, height=48)]),
-            chips_container,
-            ft.Divider(height=8),
-            results_container,
-        ], scroll=ft.ScrollMode.AUTO, spacing=12),
-        ft.Column([
-            ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD),
-            ft.Divider(height=8),
-            name_field,
-            category_dropdown,
-            date_field,
-            location_field,
-            ft.Button("記録する", on_click=on_add_record, icon=ft.Icons.ADD, height=48),
-            ft.Divider(height=16),
-            ft.Row([
-                ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
-                ft.Row([
-                    ft.TextButton("エクスポート", on_click=show_export_dialog),
-                    ft.TextButton("インポート", on_click=show_import_dialog),
-                ]),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            history_container,
-        ], scroll=ft.ScrollMode.AUTO, spacing=12),
-        ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12),
-        ft.Column([analysis_container], scroll=ft.ScrollMode.AUTO, spacing=12),
-    ]
-
-    tab_data = [
-        (ft.Icons.SEARCH, "探す"),
-        (ft.Icons.ADD_CIRCLE, "記録"),
-        (ft.Icons.EMOJI_EVENTS, "ランキング"),
-        (ft.Icons.BAR_CHART, "分析"),
-    ]
-
-    tab_buttons = []
-    for i, (icon, label) in enumerate(tab_data):
-        btn = ft.Container(
-            content=ft.Column([
-                ft.Icon(icon, size=20),
-                ft.Text(label, size=10),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
-            padding=ft.Padding(8, 10, 8, 10),
-            expand=True,
-            bgcolor=ft.Colors.BLUE_50 if i == 0 else ft.Colors.WHITE,
-            border_radius=ft.border_radius.only(top_left=12 if i == 0 else 0, top_right=12 if i == 3 else 0),
-            ink=True,
-        )
-        btn.on_click = lambda e, idx=i: switch_tab(idx)
-        tab_buttons.append(btn)
-
-    tab_bar = ft.Container(
-        content=ft.Row(tab_buttons, spacing=0, tight=True),
-        border=ft.border.only(bottom=ft.BorderSide(2, ft.Colors.BLUE_200)),
-    )
-
-    content_area = ft.Column([tab_views[0]], expand=True)
 
     def switch_tab(idx):
         nonlocal current_tab
@@ -641,9 +519,68 @@ def main(page: ft.Page):
         if idx == 3:
             refresh_analysis()
 
+    search_dropdown.on_change = on_search_cat_change
+    search_field.on_change = lambda e: setattr(search_field, 'value', e.control.value)
+    name_field.on_change = lambda e: setattr(name_field, 'value', e.control.value)
+    category_dropdown.on_change = lambda e: setattr(category_dropdown, 'value', e.control.value)
+    date_field.on_change = lambda e: setattr(date_field, 'value', e.control.value)
+    location_field.on_change = lambda e: setattr(location_field, 'value', e.control.value)
+
+    tab_views = [
+        ft.Column([
+            ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
+            ft.Divider(height=8),
+            search_dropdown,
+            ft.Row([search_field, ft.ElevatedButton("探す", on_click=on_search_click, icon=ft.Icons.SEARCH)]),
+            chips_container,
+            ft.Divider(height=8),
+            results_container,
+        ], scroll=ft.ScrollMode.AUTO, spacing=12),
+        ft.Column([
+            ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD),
+            ft.Divider(height=8),
+            name_field,
+            category_dropdown,
+            date_field,
+            location_field,
+            ft.ElevatedButton("記録する", on_click=on_add_record, icon=ft.Icons.ADD),
+            ft.Divider(height=16),
+            ft.Row([
+                ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.TextButton("エクスポート", on_click=show_export_dialog),
+                    ft.TextButton("インポート", on_click=show_import_dialog),
+                ]),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            history_container,
+        ], scroll=ft.ScrollMode.AUTO, spacing=12),
+        ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12),
+        ft.Column([analysis_container], scroll=ft.ScrollMode.AUTO, spacing=12),
+    ]
+
+    tab_labels = ["探す", "記録", "ランキング", "分析"]
+    tab_buttons = []
+    for i, label in enumerate(tab_labels):
+        btn = ft.Container(
+            content=ft.Column([
+                ft.Text(label, size=12, weight=ft.FontWeight.BOLD),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=12,
+            expand=True,
+            bgcolor=ft.Colors.BLUE_50 if i == 0 else ft.Colors.WHITE,
+            border_radius=0,
+            ink=True,
+        )
+        btn.on_click = lambda e, idx=i: switch_tab(idx)
+        tab_buttons.append(btn)
+
+    tab_bar = ft.Row(tab_buttons, spacing=0, tight=True)
+    tab_bar_divider = ft.Divider(height=1, color=ft.Colors.BLUE_200)
+    content_area = ft.Column([tab_views[0]], expand=True)
+
     load_from_storage()
 
-    page.add(tab_bar, content_area)
+    page.add(tab_bar, tab_bar_divider, content_area)
 
     page.update()
     refresh()
