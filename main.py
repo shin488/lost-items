@@ -1033,7 +1033,7 @@ def main(page: ft.Page):
         results_container,
         ft.Divider(height=8, color=ft.Colors.GREEN_200),
         simulation_container,
-    ], scroll=ft.ScrollMode.AUTO, spacing=12)
+    ], scroll=ft.ScrollMode.AUTO, spacing=12, bgcolor=ft.Colors.GREEN_50)
 
     def on_date_selected(e):
         val = e.control.value
@@ -1090,14 +1090,14 @@ def main(page: ft.Page):
             ]),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         history_container,
-    ], scroll=ft.ScrollMode.AUTO, spacing=12)
+    ], scroll=ft.ScrollMode.AUTO, spacing=12, bgcolor=ft.Colors.GREEN_50)
 
-    ranking_view = ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12)
+    ranking_view = ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12, bgcolor=ft.Colors.GREEN_50)
 
     analysis_view = ft.Column([
         analysis_progress,
         analysis_container,
-    ], scroll=ft.ScrollMode.AUTO, spacing=12)
+    ], scroll=ft.ScrollMode.AUTO, spacing=12, bgcolor=ft.Colors.GREEN_50)
 
     tabs = ft.Tabs(
         selected_index=0,
@@ -1106,6 +1106,7 @@ def main(page: ft.Page):
         on_change=on_tab_change,
         content=ft.Column([
             ft.TabBar(
+                bgcolor=ft.Colors.GREEN_50,
                 indicator_color=ft.Colors.GREEN_700,
                 label_color=ft.Colors.GREEN_800,
                 unselected_label_color=ft.Colors.GREY_600,
@@ -1118,6 +1119,7 @@ def main(page: ft.Page):
             ),
             ft.TabBarView(
                 expand=True,
+                bgcolor=ft.Colors.GREEN_50,
                 controls=[search_view, record_view, ranking_view, analysis_view],
             ),
         ]),
@@ -1140,7 +1142,7 @@ def main(page: ft.Page):
     )
 
     page.overlay.append(date_picker)
-    page.add(ft.SafeArea(tabs))
+    page.add(ft.Container(ft.SafeArea(tabs), bgcolor=ft.Colors.GREEN_50, expand=True))
 
     page.update()
     load_from_storage()
