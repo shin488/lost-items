@@ -396,7 +396,7 @@ def main(page: ft.Page):
                         ft.Text("「記録」タブからなくし物を追加しましょう", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.3, fit=ft.BoxFit.COVER),
+                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
@@ -451,7 +451,7 @@ def main(page: ft.Page):
                         ft.Text("記録が増えるとランキングが表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.3, fit=ft.BoxFit.COVER),
+                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
@@ -596,7 +596,7 @@ def main(page: ft.Page):
                         ft.Text("記録が増えると分析が表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.3, fit=ft.BoxFit.COVER),
+                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
@@ -834,8 +834,7 @@ def main(page: ft.Page):
             simulation_container,
         ], scroll=ft.ScrollMode.AUTO, spacing=12),
         bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.WHITE),
-        padding=12,
-        border_radius=12,
+        padding=12, border_radius=12, expand=True,
     )
 
     def on_date_selected(e):
@@ -891,22 +890,19 @@ def main(page: ft.Page):
             history_container,
         ], scroll=ft.ScrollMode.AUTO, spacing=12),
         bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.WHITE),
-        padding=12,
-        border_radius=12,
+        padding=12, border_radius=12, expand=True,
     )
 
     ranking_view = ft.Container(
         content=ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12),
         bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.WHITE),
-        padding=12,
-        border_radius=12,
+        padding=12, border_radius=12, expand=True,
     )
 
     analysis_view = ft.Container(
         content=ft.Column([analysis_progress, analysis_container], scroll=ft.ScrollMode.AUTO, spacing=12),
         bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.WHITE),
-        padding=12,
-        border_radius=12,
+        padding=12, border_radius=12, expand=True,
     )
 
     tabs = ft.Tabs(
@@ -948,7 +944,7 @@ def main(page: ft.Page):
     page.add(ft.Container(
         content=ft.SafeArea(tabs),
         expand=True,
-        image=ft.DecorationImage(src=BG_IMAGE, opacity=0.3, fit=ft.BoxFit.COVER),
+        image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
     ))
 
     page.update()
