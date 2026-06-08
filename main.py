@@ -337,7 +337,7 @@ def main(page: ft.Page):
                     ], spacing=3),
                     padding=10,
                     bgcolor=ft.Colors.AMBER_50 if is_top else ft.Colors.WHITE,
-                    border=ft.border.all(1, ft.Colors.TEAL_300 if is_top else ft.Colors.AMBER_100),
+                    border=ft.Border.all(1, ft.Colors.TEAL_300 if is_top else ft.Colors.AMBER_100),
                     border_radius=8,
                 )
                 rc.append(card)
@@ -368,7 +368,7 @@ def main(page: ft.Page):
                         ], spacing=3),
                         padding=10,
                         bgcolor=ft.Colors.ORANGE_50 if is_top else ft.Colors.WHITE,
-                        border=ft.border.all(1, ft.Colors.BROWN_200 if is_top else ft.Colors.AMBER_100),
+                        border=ft.Border.all(1, ft.Colors.BROWN_200 if is_top else ft.Colors.AMBER_100),
                         border_radius=8,
                     )
                     sim.append(card)
@@ -623,7 +623,7 @@ def main(page: ft.Page):
                 ] + [ft.Text(l, size=13, color=ft.Colors.GREY_700) for l in diagnosis_lines[1:]],
                     spacing=2,
                 ),
-                padding=12, border_radius=8, bgcolor=ft.Colors.AMBER_50, border=ft.border.all(1, ft.Colors.ORANGE_100),
+                padding=12, border_radius=8, bgcolor=ft.Colors.AMBER_50, border=ft.Border.all(1, ft.Colors.ORANGE_100),
             ))
             sections.append(ft.Divider(height=12))
 
@@ -636,7 +636,7 @@ def main(page: ft.Page):
                     ft.Text(str(total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.border.all(1, ft.Colors.ORANGE_100),
+                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.Border.all(1, ft.Colors.ORANGE_100),
             ),
             ft.Container(
                 ft.Column([
@@ -644,7 +644,7 @@ def main(page: ft.Page):
                     ft.Text(str(unique_items), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BROWN_700),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.ORANGE_50, expand=True, border=ft.border.all(1, ft.Colors.BROWN_200),
+                bgcolor=ft.Colors.ORANGE_50, expand=True, border=ft.Border.all(1, ft.Colors.BROWN_200),
             ),
             ft.Container(
                 ft.Column([
@@ -653,7 +653,7 @@ def main(page: ft.Page):
                     ft.Text(f"{top_item[1]}回", size=11, color=ft.Colors.GREY_600),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.border.all(1, ft.Colors.ORANGE_100),
+                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.Border.all(1, ft.Colors.ORANGE_100),
             ),
             ft.Container(
                 ft.Column([
@@ -662,7 +662,7 @@ def main(page: ft.Page):
                     ft.Text(f"{top_loc[1]}回", size=11, color=ft.Colors.GREY_600),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.ORANGE_50, expand=True, border=ft.border.all(1, ft.Colors.BROWN_200),
+                bgcolor=ft.Colors.ORANGE_50, expand=True, border=ft.Border.all(1, ft.Colors.BROWN_200),
             ),
         ], spacing=6)
         sections.append(row1)
@@ -807,7 +807,7 @@ def main(page: ft.Page):
                     cnt = len(day_records)
                     is_today = date_str == datetime.now().strftime("%Y-%m-%d")
                     bg = ft.Colors.AMBER_100 if is_today else (ft.Colors.AMBER_50 if cnt > 0 else ft.Colors.GREY_100)
-                    border = ft.border.all(2, ft.Colors.TEAL_600) if is_today else None
+                    border = ft.Border.all(2, ft.Colors.TEAL_600) if is_today else None
                     day_text = ft.Text(str(day), size=13, weight=ft.FontWeight.BOLD if cnt > 0 else ft.FontWeight.NORMAL)
                     badge = None
                     if cnt > 0:
@@ -851,7 +851,7 @@ def main(page: ft.Page):
                     ft.Text(str(resolved_total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_700),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.border.all(1, ft.Colors.ORANGE_100),
+                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.Border.all(1, ft.Colors.ORANGE_100),
             ),
             ft.Container(
                 ft.Column([
@@ -859,7 +859,7 @@ def main(page: ft.Page):
                     ft.Text(str(unresolved_total), size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BROWN_700),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.ORANGE_50, expand=True, border=ft.border.all(1, ft.Colors.BROWN_200),
+                bgcolor=ft.Colors.ORANGE_50, expand=True, border=ft.Border.all(1, ft.Colors.BROWN_200),
             ),
             ft.Container(
                 ft.Column([
@@ -867,7 +867,7 @@ def main(page: ft.Page):
                     ft.Text(f"{resolved_pct:.0f}%", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                 padding=10, border_radius=8,
-                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.border.all(1, ft.Colors.ORANGE_100),
+                bgcolor=ft.Colors.AMBER_50, expand=True, border=ft.Border.all(1, ft.Colors.ORANGE_100),
             ),
         ], spacing=6))
         sections.append(make_bar(resolved_pct, ft.Colors.TEAL_600))
