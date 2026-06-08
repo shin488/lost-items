@@ -385,9 +385,7 @@ def main(page: ft.Page):
                         ft.Text("「記録」タブからなくし物を追加しましょう", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image_src=BG_IMAGE,
-                    image_opacity=0.04,
-                    image_fit=ft.ImageFit.COVER,
+                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.04, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
@@ -442,9 +440,7 @@ def main(page: ft.Page):
                         ft.Text("記録が増えるとランキングが表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image_src=BG_IMAGE,
-                    image_opacity=0.04,
-                    image_fit=ft.ImageFit.COVER,
+                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.04, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
@@ -589,9 +585,7 @@ def main(page: ft.Page):
                         ft.Text("記録が増えると分析が表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image_src=BG_IMAGE,
-                    image_opacity=0.04,
-                    image_fit=ft.ImageFit.COVER,
+                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.04, fit=ft.BoxFit.COVER),
                 ),
             ]
             analysis_progress.visible = False
@@ -1111,9 +1105,7 @@ def main(page: ft.Page):
     page.add(ft.Container(
         content=ft.SafeArea(tabs),
         expand=True,
-        image_src=BG_IMAGE,
-        image_opacity=0.06,
-        image_fit=ft.ImageFit.COVER,
+        image=ft.DecorationImage(src=BG_IMAGE, opacity=0.06, fit=ft.BoxFit.COVER),
     ))
 
     page.update()
