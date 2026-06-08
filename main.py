@@ -10,10 +10,21 @@ STORAGE_KEY = "lost_items_v4"
 CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
 WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
 
-# フリー自然画像（Unsplash）— 背景に控えめに使用
-BG_IMAGE = "https://images.unsplash.com/photo-1484542603127-984f4f7d6f96?auto=format&fit=crop&w=1920&q=80"
-# フォールバック用（上の画像が読めない場合用の別ドメイン自然画像）
-BG_IMAGE_FALLBACK = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80"
+# フリー自然画像（Unsplash）— 背景に控えめに使用、起動ごとにランダム選択
+import random as _random
+BG_IMAGES = [
+    "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1484542603127-984f4f7d6f96?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1518173946687-a36e968f88f2?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1920&q=80",
+    "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?auto=format&fit=crop&w=1920&q=80",
+]
+BG_IMAGE = _random.choice(BG_IMAGES)
 
 
 def fuzzy_match(query: str, text: str) -> bool:
