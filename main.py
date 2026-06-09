@@ -134,8 +134,10 @@ def main(page: ft.Page):
 
     def on_tab_change(e):
         idx = int(e.data)
+        content_area.content = [search_view, record_view, ranking_view, analysis_view][idx]
         if idx == 3:
             refresh_analysis()
+        content_area.update()
 
     def on_search_click(e):
         nonlocal search_val, results
@@ -889,13 +891,13 @@ def main(page: ft.Page):
 
     analysis_view = ft.Column([analysis_progress, analysis_container], expand=True, scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    tabs = ft.Tabs(
+    content_area = ft.Container(expand=True, content=search_view)
+
+    tab_control = ft.Tabs(
         selected_index=0,
         length=4,
-        expand=True,
         on_change=on_tab_change,
         content=ft.Column(
-            expand=True,
             controls=[
                 ft.TabBar(
                     tabs=[
@@ -905,11 +907,9 @@ def main(page: ft.Page):
                         ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
                     ],
                     indicator_color=ft.Colors.TEAL_800,
+                    on_click=on_tab_change,
                 ),
-                ft.TabBarView(
-                    expand=True,
-                    controls=[search_view, record_view, ranking_view, analysis_view],
-                ),
+                ft.Container(expand=True),
             ],
         ),
     )
@@ -928,10 +928,17 @@ def main(page: ft.Page):
     )
 
     page.overlay.append(date_picker)
-    page.add(ft.Stack([
-        ft.Container(expand=True, image=ft.DecorationImage(src=BG_IMAGE, opacity=1.0, fit=ft.BoxFit.COVER)),
-        ft.SafeArea(tabs),
-    ], expand=True))
+    page.add(ft.Container(
+        expand=True,
+        image=ft.DecorationImage(src=BG_IMAGE, opacity=1.0, fit=ft.BoxFit.COVER),
+        content=ft.SafeArea(
+            expand=True,
+            content=ft.Column([
+                tab_control,
+                content_area,
+            ], expand=True, spacing=0),
+        ),
+    ))
 
     page.update()
     load_from_storage()
