@@ -826,7 +826,7 @@ def main(page: ft.Page):
         results_container,
         ft.Divider(height=8),
         simulation_container,
-    ], expand=True, scroll=ft.ScrollMode.AUTO, spacing=12)
+    ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
     def on_date_selected(e):
         val = e.control.value
@@ -878,24 +878,33 @@ def main(page: ft.Page):
             ]),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         history_container,
-    ], expand=True, scroll=ft.ScrollMode.AUTO, spacing=12)
+    ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    ranking_view = ft.Column([ranking_container], expand=True, scroll=ft.ScrollMode.AUTO, spacing=12)
+    ranking_view = ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12)
 
-    analysis_view = ft.Column([analysis_progress, analysis_container], expand=True, scroll=ft.ScrollMode.AUTO, spacing=12)
+    analysis_view = ft.Column([analysis_progress, analysis_container], scroll=ft.ScrollMode.AUTO, spacing=12)
 
     tabs = ft.Tabs(
+        content=ft.Column([
+            ft.TabBar(
+                tabs=[
+                    ft.Tab(label="探す", icon=ft.Icons.SEARCH),
+                    ft.Tab(label="記録", icon=ft.Icons.EDIT_NOTE),
+                    ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
+                    ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
+                ],
+                indicator_color=ft.Colors.TEAL_600,
+                label_color=ft.Colors.TEAL_800,
+                unselected_label_color=ft.Colors.GREY_600,
+            ),
+            ft.TabBarView(
+                controls=[search_view, record_view, ranking_view, analysis_view],
+                expand=True,
+            ),
+        ], expand=True, spacing=0),
+        length=4,
         selected_index=0,
-        tabs=[
-            ft.Tab(text="探す", icon=ft.Icons.SEARCH, content=search_view),
-            ft.Tab(text="記録", icon=ft.Icons.EDIT_NOTE, content=record_view),
-            ft.Tab(text="ランキング", icon=ft.Icons.EMOJI_EVENTS, content=ranking_view),
-            ft.Tab(text="分析", icon=ft.Icons.ANALYTICS, content=analysis_view),
-        ],
         expand=True,
-        indicator_color=ft.Colors.TEAL_600,
-        label_color=ft.Colors.TEAL_800,
-        unselected_label_color=ft.Colors.GREY_600,
         on_change=lambda e: refresh_analysis() if e.control.selected_index == 3 else None,
     )
 
