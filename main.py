@@ -897,21 +897,18 @@ def main(page: ft.Page):
         selected_index=0,
         length=4,
         on_change=on_tab_change,
-        content=ft.Column(
-            controls=[
-                ft.TabBar(
-                    tabs=[
-                        ft.Tab(label="探す", icon=ft.Icons.SEARCH),
-                        ft.Tab(label="記録", icon=ft.Icons.ADD_CIRCLE_OUTLINE),
-                        ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
-                        ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
-                    ],
-                    indicator_color=ft.Colors.TEAL_800,
-                    on_click=on_tab_change,
-                ),
-                ft.Container(expand=True),
-            ],
-        ),
+        content=ft.Column([
+            ft.TabBar(
+                tabs=[
+                    ft.Tab(label="探す", icon=ft.Icons.SEARCH),
+                    ft.Tab(label="記録", icon=ft.Icons.ADD_CIRCLE_OUTLINE),
+                    ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
+                    ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
+                ],
+                indicator_color=ft.Colors.TEAL_800,
+                on_click=on_tab_change,
+            ),
+        ]),
     )
 
     page.appbar = ft.AppBar(
