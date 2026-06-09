@@ -924,7 +924,7 @@ def main(page: ft.Page):
     page.overlay.append(date_picker)
     page.add(ft.Stack([
         ft.Container(expand=True, image=ft.DecorationImage(src=BG_IMAGE, opacity=1.0, fit=ft.BoxFit.COVER)),
-        ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.35, ft.Colors.WHITE)),
+        ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.55, ft.Colors.WHITE)),
         ft.SafeArea(expand=True, content=tabs),
     ], expand=True))
 
