@@ -7,8 +7,22 @@ import calendar
 import flet as ft
 
 STORAGE_KEY = "lost_items_v4"
-CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
+CATEGORIES_KEY = "lost_items_categories_v1"
+DEFAULT_CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
 WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
+
+DEFAULT_TENDENCIES = {
+    "財布": ["ズボンのポケット", "カバンの中", "机の上", "ベッドの上"],
+    "鍵": ["玄関の鍵穴", "カバンの中", "机の上", "ポケット"],
+    "スマホ": ["布団の隙間", "ソファの隙間", "机の上", "ベッドの上"],
+    "イヤホン": ["ポケット", "カバンの中", "机の上", "ベッドの上"],
+    "傘": ["玄関", "会社/学校", "電車の中", "駐輪場"],
+    "本": ["机の上", "カバンの中", "ベッドの上", "リビング"],
+    "文房具": ["机の上", "カバンの中", "引き出しの中"],
+    "衣類": ["洗濯機", "クローゼット", "ハンガー"],
+    "カバン": ["玄関", "机の上", "車の中", "会社/学校"],
+    "その他": ["ポケット", "カバンの中", "机の上", "ソファの隙間"],
+}
 
 # フリー自然画像（Unsplash）— 背景に控えめに使用、起動ごとにランダム選択
 import random as _random
@@ -42,6 +56,27 @@ def parse_weekday(d: str):
     return None
 
 
+def load_categories():
+    try:
+        from js import window
+        raw = window.localStorage.getItem(CATEGORIES_KEY)
+        if raw:
+            cats = json.loads(raw)
+            if isinstance(cats, list) and len(cats) > 0:
+                return cats
+    except Exception:
+        pass
+    return DEFAULT_CATEGORIES[:]
+
+
+def save_categories(cats):
+    try:
+        from js import window
+        window.localStorage.setItem(CATEGORIES_KEY, json.dumps(cats, ensure_ascii=False))
+    except Exception:
+        pass
+
+
 def main(page: ft.Page):
     page.title = "なくしもの探知機"
 
@@ -58,6 +93,7 @@ def main(page: ft.Page):
     )
 
     records = []
+    categories = load_categories()
     search_val = ""
     search_cat = ""
     results = None
@@ -70,6 +106,7 @@ def main(page: ft.Page):
     search_dropdown_ref = ft.Ref[ft.Dropdown]()
 
     chips_container = ft.Column(spacing=4)
+    location_chips_container = ft.Column(spacing=4)
     results_container = ft.Column(spacing=6)
     simulation_container = ft.Column(spacing=4)
     history_container = ft.Column(spacing=4)
@@ -111,16 +148,28 @@ def main(page: ft.Page):
         return [r for r in records if r.get("category", "") == search_cat]
 
     def do_search(query):
+        nonlocal categories
         if not query:
             return None
         matched = [r for r in get_filtered() if fuzzy_match(query, r["name"])]
         if not matched:
+            defaults = get_default_tendencies(query)
+            if defaults:
+                return defaults
             return []
         total = len(matched)
         location_counts = Counter(r["location"] for r in matched).most_common()
         max_pct = location_counts[0][1] / total * 100 if location_counts else 0
-        return [(loc or "場所不明", cnt, cnt / total * 100, cnt / total * 100 == max_pct)
+        results = [(loc or "場所不明", cnt, cnt / total * 100, cnt / total * 100 == max_pct)
                 for loc, cnt in location_counts]
+        return results
+
+    def get_default_tendencies(query):
+        for name, places in DEFAULT_TENDENCIES.items():
+            if fuzzy_match(query, name):
+                total = len(places)
+                return [(p, 1, 100 / total, i == 0) for i, p in enumerate(places)]
+        return None
 
     def search_from_history(name):
         nonlocal search_val, results
@@ -259,6 +308,78 @@ def main(page: ft.Page):
         )
         e.page.show_dialog(dlg)
 
+    def rebuild_category_dropdowns():
+        nonlocal categories
+        opts = [ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in categories]
+        search_dropdown_ref.current.options = opts
+        search_dropdown_ref.current.update()
+        cat_opts = [ft.dropdown.Option("", "選択してください")] + [ft.dropdown.Option(c) for c in categories]
+        category_ref.current.options = cat_opts
+        category_ref.current.update()
+
+    def show_category_dialog(e):
+        nonlocal categories
+        cats = categories[:]
+        cat_input = ft.TextField(label="新しいカテゴリ名", hint_text="例: 充電器", width=300)
+        cat_list = ft.Column(spacing=4)
+
+        def rebuild_cat_list():
+            used_cats = set(r.get("category", "") for r in records)
+            items = []
+            for i, c in enumerate(cats):
+                in_use = c in used_cats
+                items.append(
+                    ft.Row([
+                        ft.Text(c, expand=True, size=14),
+                        ft.Text("使用中" if in_use else "", size=11, color=ft.Colors.GREY_500, italic=True),
+                        ft.TextButton("削除",
+                            on_click=(lambda e, idx=i: delete_cat(idx)) if not in_use else None,
+                        ),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                )
+            cat_list.controls = items
+            cat_list.update()
+
+        def delete_cat(idx):
+            nonlocal categories
+            cats.pop(idx)
+            categories = cats[:]
+            save_categories(categories)
+            rebuild_cat_list()
+            rebuild_category_dropdowns()
+
+        def add_cat(ev):
+            nonlocal categories
+            name = cat_input.value.strip()
+            if not name:
+                return
+            if name in cats:
+                ev.page.show_snack_bar(ft.SnackBar(content=ft.Text("既に存在するカテゴリです")))
+                return
+            cats.append(name)
+            categories = cats[:]
+            save_categories(categories)
+            cat_input.value = ""
+            cat_input.update()
+            rebuild_cat_list()
+            rebuild_category_dropdowns()
+
+        rebuild_cat_list()
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("カテゴリ管理"),
+            content=ft.Column([
+                ft.Row([
+                    cat_input,
+                    ft.FilledButton("追加", on_click=add_cat),
+                ], tight=True),
+                ft.Divider(height=4),
+                cat_list,
+            ], tight=True, spacing=8, width=350),
+            actions=[ft.TextButton("閉じる", on_click=lambda _: setattr(dlg, 'open', False) or dlg.update())],
+        )
+        e.page.show_dialog(dlg)
+
     def make_bar(pct, color):
         inner = ft.Container(height=12, width=f"{pct}%", bgcolor=color, border_radius=6)
         outer = ft.Container(height=12, bgcolor=ft.Colors.AMBER_100, border_radius=6)
@@ -270,6 +391,7 @@ def main(page: ft.Page):
         now = datetime.now()
         current_hour = now.hour
         current_wd = now.weekday()
+        earliest = now
 
         scored = []
         for r in matched_records:
@@ -281,10 +403,14 @@ def main(page: ft.Page):
                     dt = datetime.strptime(fd, "%Y-%m-%d")
                 except ValueError:
                     continue
+            if dt < earliest:
+                earliest = dt
             hour_diff = abs(dt.hour - current_hour)
             wd_match = 1 if dt.weekday() == current_wd else 0
             time_score = max(0, 1 - hour_diff / 12)
-            score = time_score * 0.6 + wd_match * 0.4
+            recency_days = (now - dt).days
+            recency_weight = max(0.3, 1 - recency_days / 365)
+            score = (time_score * 0.6 + wd_match * 0.4) * recency_weight
             scored.append((r["location"], score))
         if not scored:
             return []
@@ -297,9 +423,30 @@ def main(page: ft.Page):
         return [(loc, sc, pct, pct == max_pct) for loc, sc, pct in ranked]
 
     def refresh():
-        nonlocal chips_container, results_container, simulation_container, history_container, ranking_container
+        nonlocal chips_container, location_chips_container, results_container, simulation_container, history_container, ranking_container
 
         chips = []
+
+        locs = list(dict.fromkeys(r.get("location", "").strip() for r in records if r.get("location", "").strip()))
+        loc_chips = []
+        for loc in locs[:10]:
+            chip = ft.Container(
+                content=ft.Text(loc, size=12),
+                padding=8,
+                bgcolor=ft.Colors.AMBER_100,
+                border_radius=10,
+                on_click=lambda e, l=loc: (setattr(location_ref.current, 'value', l), location_ref.current.update()),
+                ink=True,
+            )
+            loc_chips.append(chip)
+        if loc_chips:
+            location_chips_container.controls = [
+                ft.Text("よく使う場所 (タップで入力):", size=11, color=ft.Colors.GREY_600),
+                ft.Row(loc_chips, wrap=True, spacing=4),
+            ]
+        else:
+            location_chips_container.controls = []
+        location_chips_container.update()
         unique = list(dict.fromkeys(r["name"] for r in get_filtered()))
         for name in unique:
             chip = ft.Container(
@@ -322,25 +469,35 @@ def main(page: ft.Page):
         else:
             total = sum(cnt for _, cnt, _, _ in results)
             name = search_val.strip()
+            matched_count = len([r for r in get_filtered() if fuzzy_match(search_val, r["name"])])
+            is_default = matched_count == 0
             rc = [
                 ft.Text(f"「{name}」が見つかりそうな場所",
                         size=17, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
-                ft.Text(f"過去 {total} 件の記録から予測",
-                        size=12, color=ft.Colors.GREY_600),
-                ft.Divider(height=4),
             ]
+            if is_default:
+                rc.append(ft.Text("まだ記録が少ないため、一般的な傾向を表示しています",
+                                  size=11, color=ft.Colors.ORANGE_700, italic=True))
+            rc.append(ft.Text(f"過去 {total} 件の情報から予測",
+                              size=12, color=ft.Colors.GREY_600))
+            if is_default:
+                rc.append(ft.Text("このアイテムを実際に見つけたら記録しましょう！精度が上がります",
+                                  size=11, color=ft.Colors.GREY_500, italic=True))
+            rc.append(ft.Divider(height=4))
             for loc, cnt, pct, is_top in results:
                 color = ft.Colors.TEAL_700 if is_top else ft.Colors.TEAL_600
+                items = [
+                    ft.Row([
+                        ft.Text(loc, size=14, weight=(
+                            ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500), expand=True),
+                        ft.Text(f"{pct:.0f}%", size=15, weight=ft.FontWeight.BOLD, color=color),
+                    ]),
+                    make_bar(pct, ft.Colors.TEAL_400 if is_top else ft.Colors.ORANGE_100),
+                ]
+                if not is_default:
+                    items.append(ft.Text(f"{cnt}件", size=11, color=ft.Colors.GREY_600))
                 card = ft.Container(
-                    content=ft.Column([
-                        ft.Row([
-                            ft.Text(loc, size=14, weight=(
-                                ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500), expand=True),
-                            ft.Text(f"{pct:.0f}%", size=15, weight=ft.FontWeight.BOLD, color=color),
-                        ]),
-                        make_bar(pct, ft.Colors.TEAL_400 if is_top else ft.Colors.ORANGE_100),
-                        ft.Text(f"{cnt}件", size=11, color=ft.Colors.GREY_600),
-                    ], spacing=3),
+                    content=ft.Column(items, spacing=3),
                     padding=10,
                     bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.AMBER_50) if is_top else ft.Colors.with_opacity(0.8, ft.Colors.WHITE),
                     border=ft.Border.all(1, ft.Colors.TEAL_300 if is_top else ft.Colors.AMBER_100),
@@ -802,7 +959,7 @@ def main(page: ft.Page):
     search_dropdown = ft.Dropdown(
         ref=search_dropdown_ref,
         label="カテゴリで絞り込み",
-        options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
+        options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in categories]),
         width=300,
         on_select=on_search_cat_change,
     )
@@ -847,9 +1004,10 @@ def main(page: ft.Page):
         ft.Dropdown(
             ref=category_ref,
             label="カテゴリ",
-            options=([ft.dropdown.Option("", "選択してください")] + [ft.dropdown.Option(c) for c in CATEGORIES]),
+            options=([ft.dropdown.Option("", "選択してください")] + [ft.dropdown.Option(c) for c in categories]),
             width=300,
         ),
+        ft.TextButton("カテゴリ管理", on_click=show_category_dialog),
         ft.Row([
             ft.TextField(
                 ref=date_ref,
@@ -863,6 +1021,7 @@ def main(page: ft.Page):
             ),
         ]),
         ft.TextField(ref=location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
+        location_chips_container,
         ft.ElevatedButton("記録する", on_click=on_add_record),
         ft.Divider(height=16),
         ft.Row([
