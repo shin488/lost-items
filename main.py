@@ -148,7 +148,6 @@ def main(page: ft.Page):
         return [r for r in records if r.get("category", "") == search_cat]
 
     def do_search(query):
-        nonlocal categories
         if not query:
             return None
         matched = [r for r in get_filtered() if fuzzy_match(query, r["name"])]
@@ -311,11 +310,13 @@ def main(page: ft.Page):
     def rebuild_category_dropdowns():
         nonlocal categories
         opts = [ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in categories]
-        search_dropdown_ref.current.options = opts
-        search_dropdown_ref.current.update()
+        if search_dropdown_ref.current:
+            search_dropdown_ref.current.options = opts
+            search_dropdown_ref.current.update()
         cat_opts = [ft.dropdown.Option("", "選択してください")] + [ft.dropdown.Option(c) for c in categories]
-        category_ref.current.options = cat_opts
-        category_ref.current.update()
+        if category_ref.current:
+            category_ref.current.options = cat_opts
+            category_ref.current.update()
 
     def show_category_dialog(e):
         nonlocal categories
@@ -323,35 +324,35 @@ def main(page: ft.Page):
         cat_input = ft.TextField(label="新しいカテゴリ名", hint_text="例: 充電器", width=300)
         cat_list = ft.Column(spacing=4)
 
-        def rebuild_cat_list():
-            used_cats = set(r.get("category", "") for r in records)
-            items = []
+        def refresh_cat_ui():
+            used = set(r.get("category", "") for r in records)
+            rows = []
             for i, c in enumerate(cats):
-                in_use = c in used_cats
-                items.append(
-                    ft.Row([
-                        ft.Text(c, expand=True, size=14),
-                        ft.Text("使用中" if in_use else "", size=11, color=ft.Colors.GREY_500, italic=True),
-                        ft.TextButton("削除",
-                            on_click=(lambda e, idx=i: delete_cat(idx)) if not in_use else None,
-                        ),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                in_use = c in used
+                btn = ft.TextButton("削除",
+                    on_click=(lambda ev, idx=i: delete_category(idx)) if not in_use else None,
                 )
-            cat_list.controls = items
+                rows.append(ft.Row([
+                    ft.Text(c, expand=True, size=14),
+                    ft.Text("使用中" if in_use else "", size=11, color=ft.Colors.GREY_500, italic=True),
+                    btn,
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
+            cat_list.controls = rows
             cat_list.update()
 
-        def delete_cat(idx):
+        def delete_category(idx):
             nonlocal categories
             cats.pop(idx)
             categories = cats[:]
             save_categories(categories)
-            rebuild_cat_list()
+            refresh_cat_ui()
             rebuild_category_dropdowns()
 
-        def add_cat(ev):
+        def add_category(ev):
             nonlocal categories
             name = cat_input.value.strip()
             if not name:
+                ev.page.show_snack_bar(ft.SnackBar(content=ft.Text("カテゴリ名を入力してください")))
                 return
             if name in cats:
                 ev.page.show_snack_bar(ft.SnackBar(content=ft.Text("既に存在するカテゴリです")))
@@ -361,22 +362,26 @@ def main(page: ft.Page):
             save_categories(categories)
             cat_input.value = ""
             cat_input.update()
-            rebuild_cat_list()
+            refresh_cat_ui()
             rebuild_category_dropdowns()
 
-        rebuild_cat_list()
+        def close_dlg(ev):
+            dlg.open = False
+            dlg.update()
+
+        refresh_cat_ui()
         dlg = ft.AlertDialog(
             modal=True,
             title=ft.Text("カテゴリ管理"),
             content=ft.Column([
                 ft.Row([
                     cat_input,
-                    ft.FilledButton("追加", on_click=add_cat),
+                    ft.FilledButton("追加", on_click=add_category),
                 ], tight=True),
                 ft.Divider(height=4),
                 cat_list,
             ], tight=True, spacing=8, width=350),
-            actions=[ft.TextButton("閉じる", on_click=lambda _: setattr(dlg, 'open', False) or dlg.update())],
+            actions=[ft.TextButton("閉じる", on_click=close_dlg)],
         )
         e.page.show_dialog(dlg)
 
