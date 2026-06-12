@@ -8,6 +8,8 @@ import flet as ft
 
 STORAGE_KEY = "lost_items_v4"
 CATEGORIES_KEY = "lost_items_categories_v1"
+FLOORPLAN_KEY = "lost_items_floorplan_v1"
+MAX_GRID = 6
 DEFAULT_CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
 WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
 
@@ -77,6 +79,27 @@ def save_categories(cats):
         pass
 
 
+def load_floorplan():
+    try:
+        from js import window
+        raw = window.localStorage.getItem(FLOORPLAN_KEY)
+        if raw:
+            fp = json.loads(raw)
+            if isinstance(fp, dict) and "rows" in fp and "cols" in fp:
+                return fp
+    except Exception:
+        pass
+    return {"name": "マイ間取り", "rows": 3, "cols": 3, "cells": []}
+
+
+def save_floorplan(fp):
+    try:
+        from js import window
+        window.localStorage.setItem(FLOORPLAN_KEY, json.dumps(fp, ensure_ascii=False))
+    except Exception:
+        pass
+
+
 def main(page: ft.Page):
     page.title = "なくしもの探知機"
 
@@ -94,6 +117,7 @@ def main(page: ft.Page):
 
     records = []
     categories = load_categories()
+    floorplan = load_floorplan()
     search_val = ""
     search_cat = ""
     results = None
@@ -113,6 +137,7 @@ def main(page: ft.Page):
     ranking_container = ft.Column(spacing=8)
     analysis_container = ft.Column(spacing=8)
     analysis_progress = ft.ProgressBar(visible=False, color=ft.Colors.TEAL_600)
+    floorplan_grid_container = ft.Column(spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def load_from_storage():
         nonlocal records
@@ -961,6 +986,171 @@ def main(page: ft.Page):
         )
         page.show_dialog(dlg)
 
+    # --- Floorplan ---
+    def build_floorplan_grid():
+        nonlocal floorplan, floorplan_grid_container
+        rows = floorplan["rows"]
+        cols = floorplan["cols"]
+        cell_map = {(c["r"], c["c"]): c for c in floorplan.get("cells", [])}
+        grid_rows = []
+        for r in range(rows):
+            row_cells = []
+            for c in range(cols):
+                cell = cell_map.get((r, c))
+                label = cell["room"] if cell else ""
+                spots = cell.get("spots", "") if cell else ""
+                inner = [ft.Text(label, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)]
+                if spots:
+                    items_str = ", ".join(s.strip() for s in spots.split(",")[:3])
+                    inner.append(ft.Text(items_str, size=8, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS))
+                cont = ft.Container(
+                    content=ft.Column(inner, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1, tight=True),
+                    width=80, height=60,
+                    bgcolor=ft.Colors.AMBER_50 if cell else ft.Colors.GREY_200,
+                    border=ft.Border.all(1, ft.Colors.TEAL_300 if cell else ft.Colors.GREY_400),
+                    border_radius=6, alignment=ft.Alignment.CENTER, ink=True,
+                    on_click=lambda e, rr=r, cc=c: edit_cell_dialog(rr, cc),
+                )
+                row_cells.append(cont)
+            grid_rows.append(ft.Row(row_cells, spacing=3, alignment=ft.MainAxisAlignment.CENTER))
+        floorplan_grid_container.controls = grid_rows
+        floorplan_grid_container.update()
+
+    def edit_cell_dialog(r, c):
+        nonlocal floorplan
+        cell_map = {(c["r"], c["c"]): c for c in floorplan.get("cells", [])}
+        existing = cell_map.get((r, c))
+        room_input = ft.TextField(label="部屋名", hint_text="例: リビング", value=existing["room"] if existing else "", width=250)
+        spots_input = ft.TextField(label="スポット（カンマ区切り）", hint_text="例: ソファの隙間, テーブルの下", value=existing.get("spots", "") if existing else "", width=250)
+
+        def save_cell(ev):
+            nonlocal floorplan
+            room = room_input.value.strip()
+            spots = spots_input.value.strip()
+            if not room:
+                ev.page.show_snack_bar(ft.SnackBar(content=ft.Text("部屋名を入力してください")))
+                return
+            new_cells = [x for x in floorplan.get("cells", []) if not (x["r"] == r and x["c"] == c)]
+            new_cells.append({"r": r, "c": c, "room": room, "spots": spots})
+            floorplan["cells"] = new_cells
+            save_floorplan(floorplan)
+            dlg.open = False
+            dlg.update()
+            build_floorplan_grid()
+
+        def delete_cell(ev):
+            nonlocal floorplan
+            floorplan["cells"] = [x for x in floorplan.get("cells", []) if not (x["r"] == r and x["c"] == c)]
+            save_floorplan(floorplan)
+            dlg.open = False
+            dlg.update()
+            build_floorplan_grid()
+
+        actions = [ft.FilledButton("保存", on_click=save_cell)]
+        if existing:
+            actions.insert(0, ft.TextButton("削除", on_click=delete_cell))
+        actions.append(ft.TextButton("キャンセル", on_click=lambda e: setattr(dlg, 'open', False) or dlg.update()))
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(f"セル ({r+1}, {c+1}) を編集"),
+            content=ft.Column([room_input, spots_input], tight=True, spacing=8),
+            actions=actions,
+        )
+        page.show_dialog(dlg)
+
+    def resize_floorplan(rows, cols):
+        nonlocal floorplan
+        old_cells = floorplan.get("cells", [])
+        new_cells = [c for c in old_cells if c["r"] < rows and c["c"] < cols]
+        floorplan["rows"] = rows
+        floorplan["cols"] = cols
+        floorplan["cells"] = new_cells
+        save_floorplan(floorplan)
+        build_floorplan_grid()
+
+    def show_floorplan_selector(e):
+        cell_map = {(c["r"], c["c"]): c for c in floorplan.get("cells", [])}
+        rows = floorplan["rows"]
+        cols = floorplan["cols"]
+        grid_rows = []
+        for r in range(rows):
+            row_cells = []
+            for c in range(cols):
+                cell = cell_map.get((r, c))
+                label = cell["room"] if cell else f"({r+1},{c+1})"
+                cont = ft.Container(
+                    content=ft.Text(label, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                    width=70, height=48,
+                    bgcolor=ft.Colors.AMBER_50 if cell else ft.Colors.GREY_200,
+                    border=ft.Border.all(1, ft.Colors.TEAL_300 if cell else ft.Colors.GREY_400),
+                    border_radius=6, alignment=ft.Alignment.CENTER, ink=True,
+                    on_click=lambda ev, rr=r, cc=c: _pick_cell(ev, rr, cc),
+                )
+                row_cells.append(cont)
+            grid_rows.append(ft.Row(row_cells, spacing=3, alignment=ft.MainAxisAlignment.CENTER))
+
+        def _pick_cell(ev, r, c):
+            cell = cell_map.get((r, c))
+            if cell:
+                room = cell["room"]
+                spots = cell.get("spots", "")
+                loc_text = room
+                if spots:
+                    first_spot = spots.split(",")[0].strip()
+                    loc_text = f"{room}（{first_spot}）"
+                location_ref.current.value = loc_text
+            else:
+                location_ref.current.value = f"({r+1},{c+1})"
+            location_ref.current.update()
+            dlg.open = False
+            dlg.update()
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("間取りから選ぶ"),
+            content=ft.Column([
+                ft.Text("場所をタップして選択", size=12, color=ft.Colors.GREY_600),
+                ft.Column(grid_rows, spacing=3, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            ], tight=True, spacing=8, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            actions=[ft.TextButton("キャンセル", on_click=lambda ev: setattr(dlg, 'open', False) or dlg.update())],
+        )
+        e.page.show_dialog(dlg)
+
+    rows_input = ft.TextField(value=str(floorplan.get("rows", 3)), label="行", width=70,
+                               keyboard_type=ft.KeyboardType.NUMBER, text_align=ft.TextAlign.CENTER)
+    cols_input = ft.TextField(value=str(floorplan.get("cols", 3)), label="列", width=70,
+                               keyboard_type=ft.KeyboardType.NUMBER, text_align=ft.TextAlign.CENTER)
+
+    def on_resize_click(e):
+        try:
+            r = max(1, min(MAX_GRID, int(rows_input.value)))
+            c = max(1, min(MAX_GRID, int(cols_input.value)))
+            resize_floorplan(r, c)
+            rows_input.value = str(r)
+            cols_input.value = str(c)
+            rows_input.update()
+            cols_input.update()
+        except ValueError:
+            e.page.show_snack_bar(ft.SnackBar(content=ft.Text("数字を入力してください")))
+
+    floorplan_view = ft.Column([
+        ft.Text("間取りを設定", size=22, weight=ft.FontWeight.BOLD),
+        ft.Text("セルをタップして編集", size=12, color=ft.Colors.GREY_600, italic=True),
+        ft.Divider(height=8),
+        ft.Row([
+            rows_input, ft.Text("×", size=16), cols_input, ft.FilledButton("更新", on_click=on_resize_click),
+        ], spacing=6),
+        ft.Text("グリッドサイズ: 最大 6×6", size=11, color=ft.Colors.GREY_500),
+        ft.Divider(height=8),
+        floorplan_grid_container,
+        ft.Divider(height=8),
+        ft.TextButton("すべてリセット", on_click=lambda e: (resize_floorplan(3, 3),
+                     setattr(rows_input, 'value', '3'), rows_input.update(),
+                     setattr(cols_input, 'value', '3'), cols_input.update()),
+                     style=ft.ButtonStyle(color=ft.Colors.RED_400)),
+    ], scroll=ft.ScrollMode.AUTO, spacing=12)
+
     search_dropdown = ft.Dropdown(
         ref=search_dropdown_ref,
         label="カテゴリで絞り込み",
@@ -1026,7 +1216,11 @@ def main(page: ft.Page):
             ),
         ]),
         ft.TextField(ref=location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
-        location_chips_container,
+        ft.Row([
+            location_chips_container,
+            ft.TextButton("間取りから選ぶ", on_click=show_floorplan_selector,
+                          style=ft.ButtonStyle(color=ft.Colors.TEAL_700)),
+        ], alignment=ft.MainAxisAlignment.START),
         ft.ElevatedButton("記録する", on_click=on_add_record),
         ft.Divider(height=16),
         ft.Row([
@@ -1049,6 +1243,7 @@ def main(page: ft.Page):
                 tabs=[
                     ft.Tab(label="探す"),
                     ft.Tab(label="記録"),
+                    ft.Tab(label="間取り"),
                     ft.Tab(label="ランキング"),
                     ft.Tab(label="分析"),
                 ],
@@ -1057,14 +1252,14 @@ def main(page: ft.Page):
                 unselected_label_color=ft.Colors.GREY_600,
             ),
             ft.TabBarView(
-                controls=[search_view, record_view, ranking_view, analysis_view],
+                controls=[search_view, record_view, floorplan_view, ranking_view, analysis_view],
                 expand=True,
             ),
         ], expand=True, spacing=0),
-        length=4,
+        length=5,
         selected_index=0,
         expand=True,
-        on_change=lambda e: refresh_analysis() if e.control.selected_index == 3 else None,
+        on_change=lambda e: refresh_analysis() if e.control.selected_index == 4 else None,
     )
 
     page.appbar = ft.AppBar(
@@ -1090,6 +1285,7 @@ def main(page: ft.Page):
     page.update()
     load_from_storage()
     refresh()
+    build_floorplan_grid()
 
     page.on_load = lambda e: (load_from_storage(), refresh())
 
