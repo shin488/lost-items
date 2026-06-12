@@ -9,7 +9,7 @@ import flet as ft
 STORAGE_KEY = "lost_items_v4"
 CATEGORIES_KEY = "lost_items_categories_v1"
 FLOORPLAN_KEY = "lost_items_floorplan_v1"
-MAX_GRID = 6
+MAX_GRID = 30
 DEFAULT_CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
 WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
 
@@ -112,7 +112,7 @@ def load_floorplan():
                 return fp
     except Exception:
         pass
-    return {"name": "マイ間取り", "rows": 3, "cols": 3, "cells": []}
+    return {"name": "マイ間取り", "rows": 3, "cols": 3, "cell_size": 80, "cells": []}
 
 
 def save_floorplan(fp):
@@ -141,6 +141,7 @@ def main(page: ft.Page):
     records = []
     categories = load_categories()
     floorplan = load_floorplan()
+    floorplan.setdefault("cell_size", 80)
     for cell in floorplan.get("cells", []):
         if "spots" in cell and "furniture" not in cell:
             old = cell.pop("spots", "")
@@ -1186,9 +1187,10 @@ def main(page: ft.Page):
                         if len(furn_names) > 3:
                             display += "…"
                         inner.append(ft.Text(display, size=8, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS))
+                cs = floorplan.get("cell_size", 80)
                 cont = ft.Container(
                     content=ft.Column(inner, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1, tight=True),
-                    width=80, height=60,
+                    width=cs, height=int(cs * 0.75),
                     bgcolor=ft.Colors.AMBER_50 if cell else ft.Colors.GREY_200,
                     border=ft.Border.all(1, ft.Colors.TEAL_300 if cell else ft.Colors.GREY_400),
                     border_radius=6, alignment=ft.Alignment.CENTER, ink=True,
@@ -1366,13 +1368,15 @@ def main(page: ft.Page):
         )
         page.show_dialog(dlg)
 
-    def resize_floorplan(rows, cols):
+    def resize_floorplan(rows, cols, cell_size=None):
         nonlocal floorplan
         old_cells = floorplan.get("cells", [])
         new_cells = [c for c in old_cells if c["r"] < rows and c["c"] < cols]
         floorplan["rows"] = rows
         floorplan["cols"] = cols
         floorplan["cells"] = new_cells
+        if cell_size is not None:
+            floorplan["cell_size"] = cell_size
         save_floorplan(floorplan)
         build_floorplan_grid()
 
@@ -1392,9 +1396,10 @@ def main(page: ft.Page):
                 for c in range(cols):
                     cell = cell_map.get((r, c))
                     label = cell["room"] if cell else f"({r+1},{c+1})"
+                    cs_sel = min(floorplan.get("cell_size", 80), 100)
                     cont = ft.Container(
                         content=ft.Text(label, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
-                        width=70, height=48,
+                        width=cs_sel, height=int(cs_sel * 0.65),
                         bgcolor=ft.Colors.AMBER_50 if cell else ft.Colors.GREY_200,
                         border=ft.Border.all(1, ft.Colors.TEAL_300 if cell else ft.Colors.GREY_400),
                         border_radius=6, alignment=ft.Alignment.CENTER, ink=True,
@@ -1486,16 +1491,26 @@ def main(page: ft.Page):
                                keyboard_type=ft.KeyboardType.NUMBER, text_align=ft.TextAlign.CENTER)
     cols_input = ft.TextField(value=str(floorplan.get("cols", 3)), label="列", width=70,
                                keyboard_type=ft.KeyboardType.NUMBER, text_align=ft.TextAlign.CENTER)
+    cell_size_options = [ft.dropdown.Option(str(s)) for s in (60, 80, 100, 120, 140)]
+    cell_size_input = ft.Dropdown(
+        label="セルサイズ",
+        value=str(floorplan.get("cell_size", 80)),
+        options=cell_size_options,
+        width=100,
+    )
 
     def on_resize_click(e):
         try:
             r = max(1, min(MAX_GRID, int(rows_input.value)))
             c = max(1, min(MAX_GRID, int(cols_input.value)))
-            resize_floorplan(r, c)
+            cs = max(40, min(200, int(cell_size_input.value)))
+            resize_floorplan(r, c, cs)
             rows_input.value = str(r)
             cols_input.value = str(c)
+            cell_size_input.value = str(cs)
             rows_input.update()
             cols_input.update()
+            cell_size_input.update()
         except ValueError:
             e.page.show_snack_bar(ft.SnackBar(content=ft.Text("数字を入力してください")))
 
@@ -1504,15 +1519,17 @@ def main(page: ft.Page):
         ft.Text("セルをタップして編集", size=12, color=ft.Colors.GREY_600, italic=True),
         ft.Divider(height=8),
         ft.Row([
-            rows_input, ft.Text("×", size=16), cols_input, ft.FilledButton("更新", on_click=on_resize_click),
+            rows_input, ft.Text("×", size=16), cols_input, cell_size_input,
+            ft.FilledButton("更新", on_click=on_resize_click),
         ], spacing=6),
-        ft.Text("グリッドサイズ: 最大 6×6", size=11, color=ft.Colors.GREY_500),
+        ft.Text("グリッドサイズ: 最大 30×30", size=11, color=ft.Colors.GREY_500),
         ft.Divider(height=8),
         floorplan_grid_container,
         ft.Divider(height=8),
-        ft.TextButton("すべてリセット", on_click=lambda e: (resize_floorplan(3, 3),
+        ft.TextButton("すべてリセット", on_click=lambda e: (resize_floorplan(3, 3, 80),
                      setattr(rows_input, 'value', '3'), rows_input.update(),
-                     setattr(cols_input, 'value', '3'), cols_input.update()),
+                     setattr(cols_input, 'value', '3'), cols_input.update(),
+                     setattr(cell_size_input, 'value', '80'), cell_size_input.update()),
                      style=ft.ButtonStyle(color=ft.Colors.RED_400)),
     ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
