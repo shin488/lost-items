@@ -504,8 +504,8 @@ def main(page: ft.Page):
         e.page.show_dialog(dlg)
 
     def make_bar(pct, color):
-        inner = ft.Container(height=12, width=f"{pct}%", bgcolor=color, border_radius=6)
-        outer = ft.Container(height=12, bgcolor=ft.Colors.AMBER_100, border_radius=6)
+        inner = ft.Container(height=8, width=f"{pct}%", bgcolor=color, border_radius=4)
+        outer = ft.Container(height=8, bgcolor=ft.Colors.AMBER_100, border_radius=4)
         return ft.Stack([outer, inner])
 
     def do_time_simulation(query, matched_records):
@@ -610,22 +610,20 @@ def main(page: ft.Page):
             rc.append(ft.Divider(height=4))
             for loc, cnt, pct, is_top in results:
                 color = ft.Colors.TEAL_700 if is_top else ft.Colors.TEAL_600
-                items = [
-                    ft.Row([
-                        ft.Text(loc, size=14, weight=(
-                            ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500), expand=True),
-                        ft.Text(f"{pct:.0f}%", size=15, weight=ft.FontWeight.BOLD, color=color),
-                    ]),
-                    make_bar(pct, ft.Colors.TEAL_400 if is_top else ft.Colors.ORANGE_100),
-                ]
-                if not is_default:
-                    items.append(ft.Text(f"{cnt}件", size=11, color=ft.Colors.GREY_600))
+                suffix = f"  {cnt}件" if not is_default else ""
                 card = ft.Container(
-                    content=ft.Column(items, spacing=3),
-                    padding=10,
+                    content=ft.Column([
+                        ft.Row([
+                            ft.Text(loc, size=13, weight=(
+                                ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500), expand=True),
+                            ft.Text(f"{pct:.0f}%{suffix}", size=12, weight=ft.FontWeight.BOLD, color=color),
+                        ]),
+                        make_bar(pct, ft.Colors.TEAL_400 if is_top else ft.Colors.ORANGE_100),
+                    ], spacing=2),
+                    padding=6,
                     bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.AMBER_50) if is_top else ft.Colors.with_opacity(0.8, ft.Colors.WHITE),
                     border=ft.Border.all(1, ft.Colors.TEAL_300 if is_top else ft.Colors.AMBER_100),
-                    border_radius=8,
+                    border_radius=6,
                 )
                 rc.append(card)
             results_container.controls = rc
@@ -647,16 +645,16 @@ def main(page: ft.Page):
                     card = ft.Container(
                         content=ft.Column([
                             ft.Row([
-                                ft.Text(loc, size=14, weight=(
+                                ft.Text(loc, size=13, weight=(
                                     ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500), expand=True),
-                                ft.Text(f"{pct:.0f}%", size=14, weight=ft.FontWeight.BOLD, color=color),
+                                ft.Text(f"{pct:.0f}%", size=12, weight=ft.FontWeight.BOLD, color=color),
                             ]),
                             make_bar(pct, ft.Colors.BROWN_300 if is_top else ft.Colors.ORANGE_100),
-                        ], spacing=3),
-                        padding=10,
+                        ], spacing=2),
+                        padding=6,
                         bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.ORANGE_50) if is_top else ft.Colors.with_opacity(0.8, ft.Colors.WHITE),
                         border=ft.Border.all(1, ft.Colors.BROWN_200 if is_top else ft.Colors.AMBER_100),
-                        border_radius=8,
+                        border_radius=6,
                     )
                     sim.append(card)
                 simulation_container.controls = sim
@@ -678,15 +676,15 @@ def main(page: ft.Page):
                     markov_cards.append(ft.Container(
                         content=ft.Column([
                             ft.Row([
-                                ft.Text(loc, size=14, weight=ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500, expand=True),
-                                ft.Text(f"{pct:.0f}%", size=14, weight=ft.FontWeight.BOLD, color=color),
+                                ft.Text(loc, size=13, weight=ft.FontWeight.BOLD if is_top else ft.FontWeight.W_500, expand=True),
+                                ft.Text(f"{pct:.0f}%", size=12, weight=ft.FontWeight.BOLD, color=color),
                             ]),
                             make_bar(pct, ft.Colors.INDIGO_300 if is_top else ft.Colors.ORANGE_100),
-                        ], spacing=3),
-                        padding=10,
+                        ], spacing=2),
+                        padding=6,
                         bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.INDIGO_50) if is_top else ft.Colors.with_opacity(0.8, ft.Colors.WHITE),
                         border=ft.Border.all(1, ft.Colors.INDIGO_200 if is_top else ft.Colors.AMBER_100),
-                        border_radius=8,
+                        border_radius=6,
                     ))
                 simulation_container.controls = simulation_container.controls + markov_cards
                 simulation_container.update()
