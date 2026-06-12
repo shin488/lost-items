@@ -29,7 +29,10 @@ Flet 0.85.2 では以下の操作が**存在しないキーワード引数**で 
 
 ## 構成
 - `main.py` — 全実装（命令形API, TabBar + TabBarView パターン）
-- `.github/workflows/deploy.yml` — GitHub Actions 自動デプロイ（`flet build web`）
+- `.github/workflows/deploy.yml` — GitHub Actions 自動デプロイ（`flet build web` → `scripts/patch-pwa.sh`）
+- `pwa/manifest.json` — PWAマニフェスト（テーマカラー#00695C）
+- `pwa/service-worker.js` — PWAキャッシュSW（プリキャッシュ＋stale-while-revalidate）
+- `scripts/patch-pwa.sh` — ビルド後パッチ（manifest/SW/index.htmlにPWAメタタグ注入）
 - `requirements.txt`: `flet==0.85.2`
 - storage key: `lost_items_v4`（localStorage直接保存）
 
@@ -44,6 +47,13 @@ Flet 0.85.2 では以下の操作が**存在しないキーワード引数**で 
 - `ft.Container(bgcolor=...)` (背景色)
 - `ft.AlertDialog` + `ft.SnackBar`
 - `js.window.localStorage`（データ永続化、フォールバック: page.client_storage）
+
+## PWA
+- manifest.json: テーマカラー#00695C、表示モードstandalone、アイコン5種類
+- Service Worker: プリキャッシュ（app shell）+ stale-while-revalidate
+- iOS: apple-mobile-web-app-capable, black-translucent, 各種touch-icon（180/152/120/76）
+- アイコンはFletデフォルト（Flutterロゴ） — 差し替えたい場合は `build/web/icons/` のPNGを上書き
+- `scripts/patch-pwa.sh` が `flet build web` 後にPWA関連ファイルを注入
 
 ## 最終状態
 - 森テーマ（深緑GREEN_800 / アースブラウンBROWN_700）

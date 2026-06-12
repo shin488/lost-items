@@ -323,9 +323,9 @@ def main(page: ft.Page):
             total = sum(cnt for _, cnt, _, _ in results)
             name = search_val.strip()
             rc = [
-                ft.Text(f"🔎 「{name}」が見つかりそうな場所",
+                ft.Text(f"「{name}」が見つかりそうな場所",
                         size=17, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
-                ft.Text(f"🌿 過去 {total} 件の記録から予測",
+                ft.Text(f"過去 {total} 件の記録から予測",
                         size=12, color=ft.Colors.GREY_600),
                 ft.Divider(height=4),
             ]
@@ -356,8 +356,8 @@ def main(page: ft.Page):
                 wd_name = ["月", "火", "水", "木", "金", "土", "日"][now.weekday()]
                 sim = [
                     ft.Divider(height=16),
-                    ft.Text("⏰ もしもシミュレーター", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
-                    ft.Text(f"🌱 今は{wd_name}曜日 {now.hour}時台のデータから予測",
+                    ft.Text("もしもシミュレーター", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
+                    ft.Text(f"今は{wd_name}曜日 {now.hour}時台のデータから予測",
                             size=12, color=ft.Colors.GREY_600),
                     ft.Divider(height=4),
                 ]
@@ -386,7 +386,6 @@ def main(page: ft.Page):
             history_container.controls = [
                 ft.Container(
                     ft.Column([
-                        ft.Text("🌲", size=40),
                         ft.Text("まだ記録がありません", color=ft.Colors.TEAL_700),
                         ft.Text("「記録」タブからなくし物を追加しましょう", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
@@ -406,23 +405,17 @@ def main(page: ft.Page):
                 if cat:
                     subtitle = f"[{cat}] {subtitle}"
                 if resolved:
-                    subtitle += "  ✅ 解決済み"
+                    subtitle += " 解決済み"
                 trailing_btns = [
-                    ft.IconButton(
-                        ft.Icons.SEARCH, icon_color=ft.Colors.BLUE_300,
-                        tooltip="このアイテムを探す",
+                    ft.TextButton("探す",
                         on_click=lambda e, n=r["name"]: search_from_history(n),
                     ),
                 ]
                 if not resolved:
-                    trailing_btns.insert(0, ft.IconButton(
-                        ft.Icons.CHECK_CIRCLE_OUTLINE, icon_color=ft.Colors.TEAL_400,
-                        tooltip="見つかった！",
+                    trailing_btns.insert(0, ft.TextButton("解決",
                         on_click=lambda e, i=idx: mark_resolved(i),
                     ))
-                trailing_btns.append(ft.IconButton(
-                    ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_300,
-                    tooltip="削除",
+                trailing_btns.append(ft.TextButton("削除",
                     on_click=lambda e, i=idx: delete_record(i),
                 ))
                 hc.append(
@@ -441,7 +434,6 @@ def main(page: ft.Page):
             ranking_container.controls = [
                 ft.Container(
                     ft.Column([
-                        ft.Text("🏔", size=40),
                         ft.Text("まだデータがありません", color=ft.Colors.TEAL_700),
                         ft.Text("記録が増えるとランキングが表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
@@ -453,26 +445,21 @@ def main(page: ft.Page):
             name_counts = Counter(r["name"] for r in records).most_common()
             total = len(records)
             rc = [
-                ft.Text("🏆 よくなくした物ランキング", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
-                ft.Text(f"🌿 全 {total} 件の記録", size=12, color=ft.Colors.GREY_600, italic=True),
+                ft.Text("よくなくした物ランキング", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
+                ft.Text(f"全 {total} 件の記録", size=12, color=ft.Colors.GREY_600, italic=True),
                 ft.Divider(height=8),
             ]
-            medals = {1: "\U0001F947", 2: "\U0001F948", 3: "\U0001F949"}
             for rank, (name, cnt) in enumerate(name_counts, 1):
-                medal = medals.get(rank, f"  #{rank} ")
                 pct = cnt / total * 100
                 rc.append(
                     ft.Card(
                         ft.ListTile(
-                            leading=ft.Text(medal, size=24),
                             title=ft.Row([
                                 ft.Text(f"#{rank}", size=13, color=ft.Colors.GREY_500),
                                 ft.Text(name, size=16, weight=ft.FontWeight.W_500),
                             ]),
                             subtitle=ft.Text(f"{cnt}回 ({pct:.1f}%)", size=13, color=ft.Colors.GREY_600),
-                            trailing=ft.IconButton(
-                                ft.Icons.SEARCH, icon_color=ft.Colors.BLUE_300,
-                                tooltip="このアイテムを探す",
+                            trailing=ft.TextButton("探す",
                                 on_click=lambda e, n=name: search_from_history(n),
                             ),
                         ),
@@ -494,15 +481,12 @@ def main(page: ft.Page):
         if ratio < 0.25:
             focus_type = "集中型"
             focus_desc = "同じ物を繰り返しなくす傾向があります"
-            focus_icon = "🎯"
         elif ratio < 0.5:
             focus_type = "バランス型"
             focus_desc = "まんべんなく色々なくします"
-            focus_icon = "⚖️"
         else:
             focus_type = "分散型"
             focus_desc = "毎回違う物をなくすのが特徴です"
-            focus_icon = "🌈"
 
         name_counts = Counter(items)
         repeat_items = [(n, c) for n, c in name_counts.most_common() if c >= 3]
@@ -544,49 +528,47 @@ def main(page: ft.Page):
 
         advice_lines = []
         if peak_wd_name != "—":
-            advice_lines.append(f"💡 {peak_wd_name}は特に注意！この曜日によくなくしています")
+            advice_lines.append(f"{peak_wd_name}は特に注意！この曜日によくなくしています")
         if top_cat != "—":
-            advice_lines.append(f"💡 「{top_cat}」カテゴリの管理を見直してみましょう")
+            advice_lines.append(f"「{top_cat}」カテゴリの管理を見直してみましょう")
         if repeat_items:
             top_repeat = repeat_items[0]
-            advice_lines.append(f"💡 「{top_repeat[0]}」は{top_repeat[1]}回もなくしています！定位置を決めてみては？")
+            advice_lines.append(f"「{top_repeat[0]}」は{top_repeat[1]}回もなくしています！定位置を決めてみては？")
         if resolution_rate > 50:
-            advice_lines.append(f"✅ 解決率 {resolution_rate:.0f}%！なくしても見つけるのが上手です")
+            advice_lines.append(f"解決率 {resolution_rate:.0f}%！なくしても見つけるのが上手です")
         else:
-            advice_lines.append(f"🔍 解決率 {resolution_rate:.0f}%…なくしたらすぐに探す習慣を")
+            advice_lines.append(f"解決率 {resolution_rate:.0f}%…なくしたらすぐに探す習慣を")
         if avg_hours is not None:
             if avg_hours < 24:
-                advice_lines.append(f"⚡ 平均 {avg_hours:.0f}時間で見つけています！素早い！")
+                advice_lines.append(f"平均 {avg_hours:.0f}時間で見つけています！素早い！")
             elif avg_hours < 72:
-                advice_lines.append(f"⏳ 平均 {avg_hours:.0f}時間で発見。1〜2日以内には見つかります")
+                advice_lines.append(f"平均 {avg_hours:.0f}時間で発見。1〜2日以内には見つかります")
             else:
                 days = avg_hours / 24
-                advice_lines.append(f"🐢 平均 {days:.1f}日かかっています。見つけたらすぐ記録しましょう")
+                advice_lines.append(f"平均 {days:.1f}日かかっています。見つけたらすぐ記録しましょう")
 
         lines = []
-        lines.append(f"{focus_icon} タイプ: {focus_type}")
-        lines.append(f"  {focus_desc}")
-        lines.append(f"  なくし物の種類: {unique_items}種類 / 全{total}回")
+        lines.append(f"タイプ: {focus_type}")
+        lines.append(f"{focus_desc}")
+        lines.append(f"なくし物の種類: {unique_items}種類 / 全{total}回")
         if repeat_items:
             top_repeat = repeat_items[0]
-            lines.append(f"🏆 最多記録: 「{top_repeat[0]}」を{top_repeat[1]}回")
-        lines.append(f"📂 よくなくすカテゴリ: {top_cat}")
+            lines.append(f"最多記録: 「{top_repeat[0]}」を{top_repeat[1]}回")
+        lines.append(f"よくなくすカテゴリ: {top_cat}")
         if weekday_counts:
-            lines.append(f"📅 ピーク曜日: {peak_wd_name}")
-        lines.append(f"✅ 解決率: {resolution_rate:.0f}% ({resolved_cnt}/{total})")
+            lines.append(f"ピーク曜日: {peak_wd_name}")
+        lines.append(f"解決率: {resolution_rate:.0f}% ({resolved_cnt}/{total})")
 
-        title = f"{focus_icon} あなたは「{focus_type}」"
+        title = f"あなたは「{focus_type}」"
         return [title] + lines + [""] + advice_lines
 
     def refresh_analysis():
         analysis_progress.visible = True
-        analysis_progress.update()
 
         if not records:
             analysis_container.controls = [
                 ft.Container(
                     ft.Column([
-                        ft.Text("🍃", size=40),
                         ft.Text("まだデータがありません", color=ft.Colors.TEAL_700),
                         ft.Text("記録が増えると分析が表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
@@ -594,19 +576,33 @@ def main(page: ft.Page):
                     image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
-        else:
-            min_d = datetime.now()
-            max_d = datetime.now()
+            analysis_progress.visible = False
+            analysis_container.update()
+            analysis_progress.update()
+            return
+
+        sections = []
+
+        lost_by_date = {}
+        for r in records:
+            d = (r.get("lost_date", "") or r.get("found_date", "")[:10])
+            if d:
+                lost_by_date.setdefault(d, []).append(r)
+
+        min_d = datetime.now()
+        max_d = datetime.now()
+        if lost_by_date:
+            dates = [d for d in lost_by_date if d]
+            if dates:
+                min_d = datetime.strptime(min(dates), "%Y-%m-%d")
 
         cal_year = getattr(refresh_analysis, "cal_year", max_d.year)
         cal_month = getattr(refresh_analysis, "cal_month", max_d.month)
 
         cal_header = ft.Row([
-            ft.IconButton(ft.Icons.NAVIGATE_BEFORE, tooltip="前の月",
-                          on_click=lambda e: _navigate_cal(-1)),
+            ft.TextButton("<", on_click=lambda e: _navigate_cal(-1)),
             ft.Text(f"{cal_year}年 {cal_month}月", size=16, weight=ft.FontWeight.BOLD, expand=True, text_align=ft.TextAlign.CENTER),
-            ft.IconButton(ft.Icons.NAVIGATE_NEXT, tooltip="次の月",
-                          on_click=lambda e: _navigate_cal(1)),
+            ft.TextButton(">", on_click=lambda e: _navigate_cal(1)),
         ], alignment=ft.MainAxisAlignment.CENTER)
         sections.append(cal_header)
 
@@ -655,7 +651,7 @@ def main(page: ft.Page):
         sections.append(cal_grid)
 
         sections.append(ft.Divider(height=16))
-        sections.append(ft.Text("✅ 解決状況分析", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
+        sections.append(ft.Text("解決状況分析", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
         sections.append(ft.Divider(height=8))
 
         resolved_records = [r for r in records if r.get("resolved")]
@@ -713,7 +709,7 @@ def main(page: ft.Page):
             avg_h = sum(time_diffs) / len(time_diffs)
             min_h = min(time_diffs)
             max_h = max(time_diffs)
-            sections.append(ft.Text("⏱️ 発見までの時間", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
+            sections.append(ft.Text("発見までの時間", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
             time_row = ft.Row([
                 ft.Container(
                     ft.Column([
@@ -755,7 +751,7 @@ def main(page: ft.Page):
                 else:
                     bucket["3日以上"] += 1
             sections.append(ft.Divider(height=8))
-            sections.append(ft.Text("📊 発見時間の分布", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
+            sections.append(ft.Text("発見時間の分布", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
             for label, cnt in bucket.most_common():
                 pct = cnt / len(time_diffs) * 100
                 sections.append(ft.Column([
@@ -768,8 +764,7 @@ def main(page: ft.Page):
 
         analysis_container.controls = sections
         analysis_progress.visible = False
-        analysis_container.update()
-        analysis_progress.update()
+        page.update()
 
     def _navigate_cal(delta):
         cy = getattr(refresh_analysis, "cal_year", datetime.now().year)
@@ -813,13 +808,13 @@ def main(page: ft.Page):
     )
 
     search_view = ft.Column([
-        ft.Text("🍃 焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
+        ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
         ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
         ft.Divider(height=8),
         search_dropdown,
         ft.Row([
             ft.TextField(ref=search_ref, label="なくした物は？", hint_text="例: 財布、鍵、スマホ", expand=True),
-            ft.Button("探す", on_click=on_search_click, icon=ft.Icons.SEARCH),
+            ft.FilledButton("探す", on_click=on_search_click),
         ]),
         chips_container,
         ft.Divider(height=8),
@@ -845,7 +840,7 @@ def main(page: ft.Page):
         date_picker.update()
 
     record_view = ft.Column([
-        ft.Text("🌱 見つけたらすぐに記録しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
+        ft.Text("見つけたらすぐに記録しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
         ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD),
         ft.Divider(height=8),
         ft.TextField(ref=name_ref, label="なくした物", hint_text="例: 鍵、スマホ、財布", width=300),
@@ -864,11 +859,11 @@ def main(page: ft.Page):
                 width=300,
                 read_only=True,
                 on_focus=lambda _: open_date_picker(),
-                suffix=ft.IconButton(ft.Icons.CALENDAR_MONTH, on_click=lambda _: open_date_picker()),
+                suffix=ft.TextButton("日付選択", on_click=lambda _: open_date_picker()),
             ),
         ]),
         ft.TextField(ref=location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
-        ft.Button("記録する", on_click=on_add_record, icon=ft.Icons.ADD),
+        ft.ElevatedButton("記録する", on_click=on_add_record),
         ft.Divider(height=16),
         ft.Row([
             ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
@@ -888,10 +883,10 @@ def main(page: ft.Page):
         content=ft.Column([
             ft.TabBar(
                 tabs=[
-                    ft.Tab(label="探す", icon=ft.Icons.SEARCH),
-                    ft.Tab(label="記録", icon=ft.Icons.EDIT_NOTE),
-                    ft.Tab(label="ランキング", icon=ft.Icons.EMOJI_EVENTS),
-                    ft.Tab(label="分析", icon=ft.Icons.ANALYTICS),
+                    ft.Tab(label="探す"),
+                    ft.Tab(label="記録"),
+                    ft.Tab(label="ランキング"),
+                    ft.Tab(label="分析"),
                 ],
                 indicator_color=ft.Colors.TEAL_600,
                 label_color=ft.Colors.TEAL_800,
@@ -909,15 +904,15 @@ def main(page: ft.Page):
     )
 
     page.appbar = ft.AppBar(
-        title=ft.Row([ft.Text("🏔 ", size=22), ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD)], tight=True),
+        title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD)], tight=True),
         bgcolor=ft.Colors.TEAL_800,
         color=ft.Colors.WHITE,
         center_title=True,
         actions=[
-            ft.IconButton(ft.Icons.FILE_DOWNLOAD, icon_color=ft.Colors.WHITE,
-                          tooltip="エクスポート", on_click=show_export_dialog),
-            ft.IconButton(ft.Icons.FILE_UPLOAD, icon_color=ft.Colors.WHITE,
-                          tooltip="インポート", on_click=show_import_dialog),
+            ft.TextButton("エクスポート", on_click=show_export_dialog,
+                          style=ft.ButtonStyle(color=ft.Colors.WHITE)),
+            ft.TextButton("インポート", on_click=show_import_dialog,
+                          style=ft.ButtonStyle(color=ft.Colors.WHITE)),
         ],
     )
 

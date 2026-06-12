@@ -23,6 +23,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: yes | flet build web --base-url /lost-items
+      - run: bash scripts/patch-pwa.sh
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
