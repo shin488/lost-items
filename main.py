@@ -59,7 +59,7 @@ def fuzzy_match(query: str, text: str) -> bool:
 
 
 def parse_weekday(d: str):
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M", "%m-%d", "%m/%d"):
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y/%m/%d", "%m-%d", "%m/%d"):
         try:
             return datetime.strptime(d, fmt).weekday()
         except ValueError:
@@ -211,6 +211,7 @@ def main(page: ft.Page):
         if not matched:
             defaults = get_default_tendencies(query)
             if defaults:
+                search_context_info = "一般的な傾向から予測（まだ記録がありません）"
                 return defaults
             return []
 
@@ -240,7 +241,7 @@ def main(page: ft.Page):
 
         total = len(pool)
         counts = Counter(r["location"] for r in pool)
-        n_locations = len(set(r.get("location", "場所不明") for r in matched))
+        n_locations = len(set(r.get("location", "場所不明") for r in pool))
 
         alpha = 0.5
         results = []
@@ -299,6 +300,7 @@ def main(page: ft.Page):
         nonlocal search_val, results
         search_val = name
         search_ref.current.value = name
+        search_ref.current.update()
         results = do_search(name)
         tabs.selected_index = 0
         refresh()
@@ -358,8 +360,12 @@ def main(page: ft.Page):
         e.page.show_snack_bar(ft.SnackBar(content=ft.Text("記録しました"), bgcolor=ft.Colors.TEAL_400))
         name_ref.current.value = ""
         category_ref.current.value = ""
-        date_ref.current.value = ""
+        date_ref.current.value = datetime.now().strftime("%Y-%m-%d")
         location_ref.current.value = ""
+        name_ref.current.update()
+        category_ref.current.update()
+        date_ref.current.update()
+        location_ref.current.update()
         refresh()
 
     def delete_record(idx):
@@ -410,6 +416,13 @@ def main(page: ft.Page):
                 for item in data:
                     if not isinstance(item, dict) or "name" not in item:
                         raise ValueError("各アイテムに name フィールドが必要です")
+                    item.setdefault("category", "その他")
+                    item.setdefault("location", "")
+                    item.setdefault("location_parts", {})
+                    item.setdefault("lost_date", "")
+                    item.setdefault("found_date", "")
+                    item.setdefault("resolved", False)
+                    item.setdefault("resolution_date", None)
                 records = data
                 save()
                 dlg.open = False
@@ -530,7 +543,6 @@ def main(page: ft.Page):
         now = datetime.now()
         current_hour = now.hour
         current_wd = now.weekday()
-        earliest = now
 
         scored = []
         for r in matched_records:
@@ -542,8 +554,6 @@ def main(page: ft.Page):
                     dt = datetime.strptime(fd, "%Y-%m-%d")
                 except ValueError:
                     continue
-            if dt < earliest:
-                earliest = dt
             hour_diff = abs(dt.hour - current_hour)
             wd_match = 1 if dt.weekday() == current_wd else 0
             time_score = max(0, 1 - hour_diff / 12)
@@ -648,7 +658,7 @@ def main(page: ft.Page):
             sim_results = do_time_simulation(search_val, sim_matched)
             if sim_results:
                 now = datetime.now()
-                wd_name = ["月", "火", "水", "木", "金", "土", "日"][now.weekday()]
+                wd_name = WEEKDAYS_JP[now.weekday()]
                 sim = [
                     ft.Divider(height=16),
                     ft.Text("もしもシミュレーター", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
@@ -797,96 +807,9 @@ def main(page: ft.Page):
         history_container.update()
         ranking_container.update()
 
-    def build_diagnosis(items, total, unique_items, top_item):
-        if not items:
-            return []
-        ratio = unique_items / total if total > 0 else 0
-        if ratio < 0.25:
-            focus_type = "集中型"
-            focus_desc = "同じ物を繰り返しなくす傾向があります"
-        elif ratio < 0.5:
-            focus_type = "バランス型"
-            focus_desc = "まんべんなく色々なくします"
-        else:
-            focus_type = "分散型"
-            focus_desc = "毎回違う物をなくすのが特徴です"
-
-        name_counts = Counter(items)
-        repeat_items = [(n, c) for n, c in name_counts.most_common() if c >= 3]
-
-        cats = [r.get("category", "その他") for r in records]
-        top_cat = Counter(cats).most_common(1)[0][0] if cats else "—"
-
-        weekday_counts = Counter()
-        for r in records:
-            d = r.get("lost_date", "") or r.get("found_date", "")[:10]
-            wd = parse_weekday(d)
-            if wd is not None:
-                weekday_counts[wd] += 1
-
-        peak_wd_name = "—"
-        if weekday_counts:
-            peak_wd = weekday_counts.most_common(1)[0][0]
-            peak_wd_name = WEEKDAYS_JP[peak_wd]
-
-        resolved_list = [r for r in records if r.get("resolved")]
-        resolved_cnt = len(resolved_list)
-        resolution_rate = resolved_cnt / total * 100 if total > 0 else 0
-
-        time_diffs = []
-        for r in resolved_list:
-            ld = r.get("lost_date", "")
-            rd = r.get("resolution_date", "")
-            if ld and rd:
-                try:
-                    lost = datetime.strptime(ld, "%Y-%m-%d")
-                    res = datetime.strptime(rd, "%Y-%m-%d %H:%M")
-                    diff_hours = (res - lost).total_seconds() / 3600
-                    if diff_hours >= 0:
-                        time_diffs.append(diff_hours)
-                except ValueError:
-                    pass
-
-        avg_hours = sum(time_diffs) / len(time_diffs) if time_diffs else None
-
-        advice_lines = []
-        if peak_wd_name != "—":
-            advice_lines.append(f"{peak_wd_name}は特に注意！この曜日によくなくしています")
-        if top_cat != "—":
-            advice_lines.append(f"「{top_cat}」カテゴリの管理を見直してみましょう")
-        if repeat_items:
-            top_repeat = repeat_items[0]
-            advice_lines.append(f"「{top_repeat[0]}」は{top_repeat[1]}回もなくしています！定位置を決めてみては？")
-        if resolution_rate > 50:
-            advice_lines.append(f"解決率 {resolution_rate:.0f}%！なくしても見つけるのが上手です")
-        else:
-            advice_lines.append(f"解決率 {resolution_rate:.0f}%…なくしたらすぐに探す習慣を")
-        if avg_hours is not None:
-            if avg_hours < 24:
-                advice_lines.append(f"平均 {avg_hours:.0f}時間で見つけています！素早い！")
-            elif avg_hours < 72:
-                advice_lines.append(f"平均 {avg_hours:.0f}時間で発見。1〜2日以内には見つかります")
-            else:
-                days = avg_hours / 24
-                advice_lines.append(f"平均 {days:.1f}日かかっています。見つけたらすぐ記録しましょう")
-
-        lines = []
-        lines.append(f"タイプ: {focus_type}")
-        lines.append(f"{focus_desc}")
-        lines.append(f"なくし物の種類: {unique_items}種類 / 全{total}回")
-        if repeat_items:
-            top_repeat = repeat_items[0]
-            lines.append(f"最多記録: 「{top_repeat[0]}」を{top_repeat[1]}回")
-        lines.append(f"よくなくすカテゴリ: {top_cat}")
-        if weekday_counts:
-            lines.append(f"ピーク曜日: {peak_wd_name}")
-        lines.append(f"解決率: {resolution_rate:.0f}% ({resolved_cnt}/{total})")
-
-        title = f"あなたは「{focus_type}」"
-        return [title] + lines + [""] + advice_lines
-
     def refresh_analysis():
         analysis_progress.visible = True
+        page.update()
 
         if not records:
             analysis_container.controls = [
@@ -931,7 +854,7 @@ def main(page: ft.Page):
 
         cal_grid = ft.Column(spacing=2)
         month_cal = calendar.monthcalendar(cal_year, cal_month)
-        day_names = ["月", "火", "水", "木", "金", "土", "日"]
+        day_names = [w.replace("曜日", "") for w in WEEKDAYS_JP]
         cal_grid.controls.append(
             ft.Row([ft.Container(ft.Text(d, size=11, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER),
                                  width=42, height=24) for d in day_names], spacing=2, alignment=ft.MainAxisAlignment.CENTER)
@@ -1281,7 +1204,7 @@ def main(page: ft.Page):
                 cell = find_cell()
                 if not cell:
                     floorplan["cells"].append({"r": r, "c": c, "room": room_input.value.strip() or "部屋", "furniture": []})
-                    cell = cell_map.get((r, c))
+                    cell = floorplan["cells"][-1]
                 cell.setdefault("furniture", []).append({"name": name, "spots": []})
                 save_floorplan(floorplan)
                 sub_dlg.open = False
@@ -1570,6 +1493,7 @@ def main(page: ft.Page):
     )
 
     def open_date_picker(e=None):
+        date_picker.last_date = datetime.now()
         date_picker.open = True
         date_picker.update()
 
@@ -1669,7 +1593,7 @@ def main(page: ft.Page):
     refresh()
     build_floorplan_grid()
 
-    page.on_load = lambda e: (load_from_storage(), refresh())
+    page.on_load = lambda e: refresh()
 
 
 ft.run(main, view=ft.AppView.WEB_BROWSER)
