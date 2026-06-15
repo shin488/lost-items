@@ -208,108 +208,150 @@ def main(page: ft.Page):
             name_to_cat[name] = counts.most_common(1)[0][0]
         return name_to_cat
 
-    def build_item_location_matrix():
-        matrix = defaultdict(Counter)
+    def build_item_loc_graph(records):
+        item_to_loc = defaultdict(Counter)
+        loc_to_item = defaultdict(Counter)
         for r in records:
             name = r.get("name", "")
             loc = r.get("location", "")
             if name and loc:
-                matrix[name][loc] += 1
-        return matrix
+                item_to_loc[name][loc] += 1
+                loc_to_item[loc][name] += 1
+        return item_to_loc, loc_to_item
 
-    def item_similarity(name1, name2, matrix, name_to_cat):
-        if name1 == name2:
-            return 1.0
-        cat1 = name_to_cat.get(name1, "")
-        cat2 = name_to_cat.get(name2, "")
-        vec1 = matrix.get(name1)
-        vec2 = matrix.get(name2)
-        if vec1 is not None and vec2 is not None:
-            all_locs = set(vec1) | set(vec2)
-            dot = sum(vec1.get(l, 0) * vec2.get(l, 0) for l in all_locs)
-            norm1 = sum(v * v for v in vec1.values()) ** 0.5
-            norm2 = sum(v * v for v in vec2.values()) ** 0.5
-            if norm1 > 0 and norm2 > 0:
-                cos = dot / (norm1 * norm2)
-                if cos > 0.1:
-                    return cos
-        if cat1 and cat1 == cat2:
-            return 0.2
-        return 0.05
+    def build_loc_sim_graph(records):
+        loc_items = defaultdict(set)
+        for r in records:
+            loc = r.get("location", "")
+            name = r.get("name", "")
+            if loc and name:
+                loc_items[loc].add(name)
+        locs = list(loc_items.keys())
+        graph = defaultdict(dict)
+        for i, l1 in enumerate(locs):
+            for l2 in locs[i+1:]:
+                inter = loc_items[l1] & loc_items[l2]
+                union = loc_items[l1] | loc_items[l2]
+                j = len(inter) / len(union) if union else 0
+                if j >= 0.15:
+                    graph[l1][l2] = j
+                    graph[l2][l1] = j
+        return graph
 
     def unified_predict(query_name):
         if not query_name:
             return None, ""
-        now = datetime.now()
-        current_dow = now.weekday()
-        current_hour = now.hour
-
         pool = get_filtered()
-        matrix = build_item_location_matrix()
-        name_to_cat = build_name_to_category()
+        item_to_loc, loc_to_item = build_item_loc_graph(pool)
+        loc_sim = build_loc_sim_graph(pool)
 
-        matched = [r for r in pool if fuzzy_match(query_name, r.get("name", ""))]
-        has_direct = len(matched) > 0
-
-        location_weights = Counter()
-        direct_count = 0
-        indirect_count = 0
-        total_sim = 0.0
-
-        for r in pool:
-            r_name = r.get("name", "")
-            if not r_name:
-                continue
-            sim = item_similarity(query_name, r_name, matrix, name_to_cat)
-            if sim < 0.02:
-                continue
-
-            fd = r.get("found_date", "")
-            dt = parse_dt(fd)
-            if not dt:
-                continue
-
-            dow_w = 1.0 if dt.weekday() == current_dow else (0.5 if abs(dt.weekday() - current_dow) in (1, 6) else 0.2)
-            hour_diff = abs(dt.hour - current_hour)
-            hour_w = math.exp(-hour_diff * hour_diff / 18)
-            recency = max(0.2, 1 - (now - dt).days / 180)
-
-            weight = sim * dow_w * hour_w * recency
-            total_sim += sim
-
-            loc = r.get("location", "")
-            if loc:
-                location_weights[loc] += weight
-                if sim >= 0.9:
-                    direct_count += 1
-                else:
-                    indirect_count += 1
-
-        if not location_weights or (not has_direct and total_sim < 0.5):
+        if not item_to_loc:
             defaults = get_default_tendencies(query_name)
             if defaults:
                 return defaults, "一般的な傾向から予測（まだ記録がありません）"
             return [], ""
 
-        total_weight = sum(location_weights.values())
-        n_locs = len(location_weights)
-        alpha = max(0.5, min(3.0, 5.0 / max(total_weight, 0.1)))
+        matched = [n for n in item_to_loc if fuzzy_match(query_name, n)]
+        seeds = matched[:]
+        if not seeds:
+            ntc = build_name_to_category()
+            q_cat = None
+            for n, c in ntc.items():
+                if fuzzy_match(query_name, n):
+                    q_cat = c
+                    break
+            if q_cat:
+                seeds = [n for n in item_to_loc if ntc.get(n) == q_cat]
+        has_direct = bool(matched)
+        if not seeds:
+            defaults = get_default_tendencies(query_name)
+            if defaults:
+                return defaults, "一般的な傾向から予測（まだ記録がありません）"
+            return [], ""
+
+        alpha = 0.3
+        item_scores = defaultdict(float)
+        for s in seeds:
+            item_scores[s] = 1.0 / len(seeds)
+        location_scores = defaultdict(float)
+
+        for _ in range(20):
+            nls = defaultdict(float)
+            for item, sc in item_scores.items():
+                if sc == 0:
+                    continue
+                nbrs = item_to_loc.get(item, {})
+                total = sum(nbrs.values())
+                if total > 0:
+                    for loc, w in nbrs.items():
+                        nls[loc] += sc * w / total
+            for loc, sc in list(nls.items()):
+                for sl, sj in loc_sim.get(loc, {}).items():
+                    nls[sl] += sc * sj * 0.3
+            nis = defaultdict(float)
+            for loc, sc in nls.items():
+                nbrs = loc_to_item.get(loc, {})
+                total = sum(nbrs.values())
+                if total > 0:
+                    for item, w in nbrs.items():
+                        nis[item] += sc * w / total
+            for item in list(item_scores.keys()) + list(nis.keys()):
+                nis[item] = (1 - alpha) * nis.get(item, 0)
+            for s in seeds:
+                nis[s] += alpha / len(seeds)
+            diff = sum(abs(nis.get(k, 0) - v) for k, v in item_scores.items())
+            item_scores = nis
+            location_scores = nls
+            if diff < 1e-8:
+                break
+
+        if not location_scores:
+            defaults = get_default_tendencies(query_name)
+            if defaults:
+                return defaults, "一般的な傾向から予測（まだ記録がありません）"
+            return [], ""
+
+        now = datetime.now()
+        cdow = now.weekday()
+        chour = now.hour
+        loc_temporal = Counter()
+        for r in pool:
+            loc = r.get("location", "")
+            if loc not in location_scores:
+                continue
+            fd = r.get("found_date", "")
+            dt = parse_dt(fd)
+            if not dt:
+                continue
+            dw = 1.0 if dt.weekday() == cdow else (0.5 if abs(dt.weekday() - cdow) in (1, 6) else 0.2)
+            hw = math.exp(-abs(dt.hour - chour) ** 2 / 18)
+            rw = max(0.2, 1 - (now - dt).days / 180)
+            loc_temporal[loc] += dw * hw * rw
+
+        t_total = sum(loc_temporal.values()) or 1
+        combined = {}
+        for loc, gs in location_scores.items():
+            tw = loc_temporal.get(loc, 0.5) / t_total * len(loc_temporal)
+            combined[loc] = gs * (0.6 + 0.4 * min(tw, 3) / 3)
+
+        total = sum(combined.values())
+        if total == 0:
+            defaults = get_default_tendencies(query_name)
+            if defaults:
+                return defaults, "一般的な傾向から予測（まだ記録がありません）"
+            return [], ""
 
         results = []
-        for loc, w in location_weights.most_common():
-            pct = (w + alpha) / (total_weight + alpha * n_locs) * 100
-            results.append((loc, round(w, 1), pct, False))
-
+        for loc, sc in sorted(combined.items(), key=lambda x: -x[1]):
+            pct = sc / total * 100
+            results.append((loc, round(sc, 1), pct, False))
         if results:
-            max_pct = max(r[2] for r in results)
-            results = [(loc, w, pct, pct == max_pct) for loc, w, pct, _ in results]
+            mp = max(r[2] for r in results)
+            results = [(l, w, p, p == mp) for l, w, p, _ in results]
 
-        parts = []
-        if direct_count:
-            parts.append(f"直接{direct_count}件")
-        if indirect_count:
-            parts.append(f"類似{indirect_count}件")
-        ctx = f"📊 {' + '.join(parts)}のデータから予測"
+        n_related = len([n for n, sc in item_scores.items() if n not in seeds and sc > 0.01])
+        kind = "同カテゴリ" if not has_direct else "直接一致"
+        ctx = f"📊 グラフ伝搬（{kind}）: 起点{len(seeds)} + 関連{n_related}"
         return results, ctx
 
     def search_from_history(name):
