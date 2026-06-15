@@ -4,6 +4,8 @@ import json
 import unicodedata
 import calendar
 import math
+import uuid
+import random
 
 import flet as ft
 
@@ -27,21 +29,25 @@ DEFAULT_TENDENCIES = {
     "その他": ["ポケット", "カバンの中", "机の上", "ソファの隙間"],
 }
 
-# フリー自然画像（Unsplash）— 背景に控えめに使用、起動ごとにランダム選択
-import random as _random
-BG_IMAGES = [
-    "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1484542603127-984f4f7d6f96?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1518173946687-a36e968f88f2?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1920&q=80",
-    "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?auto=format&fit=crop&w=1920&q=80",
-]
-BG_IMAGE = _random.choice(BG_IMAGES)
+# グラフ伝搬定数
+RWR_ALPHA = 0.3
+RWR_ITERATIONS = 20
+RWR_CONVERGENCE = 1e-8
+LOC_SIM_THRESHOLD = 0.15
+LOC_SIM_DECAY = 0.3
+LOC_TEMPORAL_WEIGHT = 0.4
+LOC_TEMPORAL_BASE = 0.6
+RECENCY_HALFLIFE_DAYS = 30
+DOW_WEIGHTS = {0: 1.0, 1: 0.5, 6: 0.5}
+DOW_OTHER = 0.2
+HOUR_SIGMA_SQ = 18
+RELATED_SCORE_THRESHOLD = 0.01
+
+_js_window = None
+try:
+    from js import window as _js_window
+except Exception:
+    pass
 
 
 def fuzzy_match(query: str, text: str) -> bool:
@@ -67,46 +73,67 @@ def parse_dt(s):
             pass
     return None
 
+
+def _ls_get(key):
+    if _js_window is not None:
+        try:
+            return _js_window.localStorage.getItem(key)
+        except Exception:
+            pass
+    return None
+
+
+def _ls_set(key, val):
+    if _js_window is not None:
+        try:
+            _js_window.localStorage.setItem(key, val)
+            return True
+        except Exception:
+            pass
+    return False
+
+
 def load_categories():
-    try:
-        from js import window
-        raw = window.localStorage.getItem(CATEGORIES_KEY)
-        if raw:
+    raw = _ls_get(CATEGORIES_KEY)
+    if raw:
+        try:
             cats = json.loads(raw)
             if isinstance(cats, list) and len(cats) > 0:
                 return cats
-    except Exception:
-        pass
+        except Exception:
+            pass
     return DEFAULT_CATEGORIES[:]
 
 
 def save_categories(cats):
-    try:
-        from js import window
-        window.localStorage.setItem(CATEGORIES_KEY, json.dumps(cats, ensure_ascii=False))
-    except Exception:
-        pass
+    _ls_set(CATEGORIES_KEY, json.dumps(cats, ensure_ascii=False))
 
 
 def load_floorplan():
-    try:
-        from js import window
-        raw = window.localStorage.getItem(FLOORPLAN_KEY)
-        if raw:
+    raw = _ls_get(FLOORPLAN_KEY)
+    if raw:
+        try:
             fp = json.loads(raw)
             if isinstance(fp, dict) and "rows" in fp and "cols" in fp:
                 return fp
-    except Exception:
-        pass
+        except Exception:
+            pass
     return {"name": "マイ間取り", "rows": 3, "cols": 3, "cell_size": 80, "cells": []}
 
 
 def save_floorplan(fp):
-    try:
-        from js import window
-        window.localStorage.setItem(FLOORPLAN_KEY, json.dumps(fp, ensure_ascii=False))
-    except Exception:
-        pass
+    _ls_set(FLOORPLAN_KEY, json.dumps(fp, ensure_ascii=False))
+
+
+def migrate_floorplan_cells(cells):
+    changed = False
+    for cell in cells:
+        if "spots" in cell and "furniture" not in cell:
+            old = cell.pop("spots", "")
+            cell["furniture"] = [{"name": "その他", "spots": [s.strip() for s in old.split(",") if s.strip()]}] if old.strip() else []
+            changed = True
+        cell.setdefault("furniture", [])
+    return changed
 
 
 def main(page: ft.Page):
@@ -128,16 +155,16 @@ def main(page: ft.Page):
     categories = load_categories()
     floorplan = load_floorplan()
     floorplan.setdefault("cell_size", 80)
-    for cell in floorplan.get("cells", []):
-        if "spots" in cell and "furniture" not in cell:
-            old = cell.pop("spots", "")
-            cell["furniture"] = [{"name": "その他", "spots": [s.strip() for s in old.split(",") if s.strip()]}] if old.strip() else []
-        cell.setdefault("furniture", [])
-    save_floorplan(floorplan)
+    if migrate_floorplan_cells(floorplan.get("cells", [])):
+        save_floorplan(floorplan)
     search_val = ""
     search_cat = ""
     results = None
     search_context_info = ""
+    search_loading = False
+
+    cal_year = datetime.now().year
+    cal_month = datetime.now().month
 
     search_ref = ft.Ref[ft.TextField]()
     name_ref = ft.Ref[ft.TextField]()
@@ -158,30 +185,41 @@ def main(page: ft.Page):
 
     def load_from_storage():
         nonlocal records
-        try:
-            from js import window
-            raw = window.localStorage.getItem(STORAGE_KEY)
-            if raw is not None:
+        raw = _ls_get(STORAGE_KEY)
+        if raw is not None:
+            try:
                 data = json.loads(raw)
                 if isinstance(data, list):
                     records = data
-        except Exception:
-            try:
-                raw = page.client_storage.get(STORAGE_KEY)
-                if raw and isinstance(raw, list):
-                    records = raw
+                    return
             except Exception:
                 pass
+        try:
+            raw = page.client_storage.get(STORAGE_KEY)
+            if raw and isinstance(raw, list):
+                records = raw
+        except Exception:
+            pass
+
+    def ensure_record_ids():
+        nonlocal records
+        changed = False
+        for r in records:
+            if "id" not in r:
+                r["id"] = str(uuid.uuid4())
+                changed = True
+        if changed:
+            save()
 
     def save():
+        raw = json.dumps(records, ensure_ascii=False)
+        if _ls_set(STORAGE_KEY, raw):
+            return True
         try:
-            from js import window
-            window.localStorage.setItem(STORAGE_KEY, json.dumps(records, ensure_ascii=False))
+            page.client_storage.set(STORAGE_KEY, records)
+            return True
         except Exception:
-            try:
-                page.client_storage.set(STORAGE_KEY, records)
-            except Exception:
-                pass
+            return False
 
     def get_filtered():
         nonlocal search_cat
@@ -208,10 +246,10 @@ def main(page: ft.Page):
             name_to_cat[name] = counts.most_common(1)[0][0]
         return name_to_cat
 
-    def build_item_loc_graph(records):
+    def build_item_loc_graph(records_slice):
         item_to_loc = defaultdict(Counter)
         loc_to_item = defaultdict(Counter)
-        for r in records:
+        for r in records_slice:
             name = r.get("name", "")
             loc = r.get("location", "")
             if name and loc:
@@ -219,9 +257,9 @@ def main(page: ft.Page):
                 loc_to_item[loc][name] += 1
         return item_to_loc, loc_to_item
 
-    def build_loc_sim_graph(records):
+    def build_loc_sim_graph(records_slice):
         loc_items = defaultdict(set)
-        for r in records:
+        for r in records_slice:
             loc = r.get("location", "")
             name = r.get("name", "")
             if loc and name:
@@ -233,7 +271,7 @@ def main(page: ft.Page):
                 inter = loc_items[l1] & loc_items[l2]
                 union = loc_items[l1] | loc_items[l2]
                 j = len(inter) / len(union) if union else 0
-                if j >= 0.15:
+                if j >= LOC_SIM_THRESHOLD:
                     graph[l1][l2] = j
                     graph[l2][l1] = j
         return graph
@@ -269,13 +307,12 @@ def main(page: ft.Page):
                 return defaults, "一般的な傾向から予測（まだ記録がありません）"
             return [], ""
 
-        alpha = 0.3
         item_scores = defaultdict(float)
         for s in seeds:
             item_scores[s] = 1.0 / len(seeds)
         location_scores = defaultdict(float)
 
-        for _ in range(20):
+        for _ in range(RWR_ITERATIONS):
             nls = defaultdict(float)
             for item, sc in item_scores.items():
                 if sc == 0:
@@ -287,7 +324,7 @@ def main(page: ft.Page):
                         nls[loc] += sc * w / total
             for loc, sc in list(nls.items()):
                 for sl, sj in loc_sim.get(loc, {}).items():
-                    nls[sl] += sc * sj * 0.3
+                    nls[sl] += sc * sj * LOC_SIM_DECAY
             nis = defaultdict(float)
             for loc, sc in nls.items():
                 nbrs = loc_to_item.get(loc, {})
@@ -296,13 +333,13 @@ def main(page: ft.Page):
                     for item, w in nbrs.items():
                         nis[item] += sc * w / total
             for item in list(item_scores.keys()) + list(nis.keys()):
-                nis[item] = (1 - alpha) * nis.get(item, 0)
+                nis[item] = (1 - RWR_ALPHA) * nis.get(item, 0)
             for s in seeds:
-                nis[s] += alpha / len(seeds)
+                nis[s] += RWR_ALPHA / len(seeds)
             diff = sum(abs(nis.get(k, 0) - v) for k, v in item_scores.items())
             item_scores = nis
             location_scores = nls
-            if diff < 1e-8:
+            if diff < RWR_CONVERGENCE:
                 break
 
         if not location_scores:
@@ -323,16 +360,16 @@ def main(page: ft.Page):
             dt = parse_dt(fd)
             if not dt:
                 continue
-            dw = 1.0 if dt.weekday() == cdow else (0.5 if abs(dt.weekday() - cdow) in (1, 6) else 0.2)
-            hw = math.exp(-abs(dt.hour - chour) ** 2 / 18)
-            rw = max(0.2, 1 - (now - dt).days / 180)
+            dw = DOW_WEIGHTS.get(abs(dt.weekday() - cdow), DOW_OTHER)
+            hw = math.exp(-abs(dt.hour - chour) ** 2 / HOUR_SIGMA_SQ)
+            rw = 0.5 ** ((now - dt).days / RECENCY_HALFLIFE_DAYS)
             loc_temporal[loc] += dw * hw * rw
 
         t_total = sum(loc_temporal.values()) or 1
         combined = {}
         for loc, gs in location_scores.items():
             tw = loc_temporal.get(loc, 0.5) / t_total * len(loc_temporal)
-            combined[loc] = gs * (0.6 + 0.4 * min(tw, 3) / 3)
+            combined[loc] = gs * (LOC_TEMPORAL_BASE + LOC_TEMPORAL_WEIGHT * min(tw, 3) / 3)
 
         total = sum(combined.values())
         if total == 0:
@@ -341,33 +378,34 @@ def main(page: ft.Page):
                 return defaults, "一般的な傾向から予測（まだ記録がありません）"
             return [], ""
 
-        results = []
+        results_list = []
         for loc, sc in sorted(combined.items(), key=lambda x: -x[1]):
             pct = sc / total * 100
-            results.append((loc, round(sc, 1), pct, False))
-        if results:
-            mp = max(r[2] for r in results)
-            results = [(l, w, p, p == mp) for l, w, p, _ in results]
+            results_list.append((loc, round(sc, 1), pct, False))
+        if results_list:
+            mp = max(r[2] for r in results_list)
+            results_list = [(l, w, p, p == mp) for l, w, p, _ in results_list]
 
-        n_related = len([n for n, sc in item_scores.items() if n not in seeds and sc > 0.01])
+        n_related = len([n for n, sc in item_scores.items() if n not in seeds and sc > RELATED_SCORE_THRESHOLD])
         kind = "同カテゴリ" if not has_direct else "直接一致"
-        ctx = f"📊 グラフ伝搬（{kind}）: 起点{len(seeds)} + 関連{n_related}"
-        return results, ctx
+        ctx = f"グラフ伝搬（{kind}）: 起点{len(seeds)} + 関連{n_related}"
+        return results_list, ctx
 
     def search_from_history(name):
-        nonlocal search_val, results, search_context_info
+        nonlocal search_val, results, search_context_info, search_loading
         search_val = name
         search_ref.current.value = name
         search_ref.current.update()
+        search_loading = True
+        refresh()
         results, search_context_info = unified_predict(name)
+        search_loading = False
         tabs.selected_index = 0
         tabs.update()
         refresh()
 
-
-
     def on_search_click(e):
-        nonlocal search_val, results, search_context_info
+        nonlocal search_val, results, search_context_info, search_loading
         q = search_ref.current.value.strip()
         if not q:
             e.page.show_snack_bar(ft.SnackBar(content=ft.Text("なくした物を入力してください")))
@@ -375,7 +413,10 @@ def main(page: ft.Page):
             refresh()
             return
         search_val = q
+        search_loading = True
+        refresh()
         results, search_context_info = unified_predict(q)
+        search_loading = False
         refresh()
 
     def on_search_cat_change(e):
@@ -405,6 +446,7 @@ def main(page: ft.Page):
         if len(parts) >= 3:
             location_parts["spot"] = parts[2]
         rec = {
+            "id": str(uuid.uuid4()),
             "name": name,
             "category": category_ref.current.value or "その他",
             "location": location,
@@ -415,7 +457,10 @@ def main(page: ft.Page):
             "resolution_date": None,
         }
         records = records + [rec]
-        save()
+        if not save():
+            e.page.show_snack_bar(ft.SnackBar(
+                content=ft.Text("保存に失敗しました"), bgcolor=ft.Colors.RED_400))
+            return
         e.page.show_snack_bar(ft.SnackBar(content=ft.Text("記録しました"), bgcolor=ft.Colors.TEAL_400))
         name_ref.current.value = ""
         category_ref.current.value = ""
@@ -427,14 +472,114 @@ def main(page: ft.Page):
         location_ref.current.update()
         refresh()
 
-    def delete_record(idx):
-        nonlocal records
-        records.pop(idx)
-        save()
-        refresh()
+    def find_record_idx(rid):
+        for i, r in enumerate(records):
+            if r.get("id") == rid:
+                return i
+        return None
 
-    def mark_resolved(idx):
+    def delete_record(rid):
         nonlocal records
+        idx = find_record_idx(rid)
+        if idx is not None:
+            records.pop(idx)
+            save()
+            refresh()
+
+    def confirm_delete(rid, name):
+        def do_delete(e):
+            dlg.open = False
+            dlg.update()
+            delete_record(rid)
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(f"「{name}」を削除しますか？"),
+            content=ft.Text("この操作は元に戻せません", size=13, color=ft.Colors.GREY_600),
+            actions=[
+                ft.TextButton("キャンセル", on_click=lambda e: setattr(dlg, 'open', False) or dlg.update()),
+                ft.FilledButton("削除", on_click=do_delete, style=ft.ButtonStyle(bgcolor=ft.Colors.RED_400, color=ft.Colors.WHITE)),
+            ],
+        )
+        page.show_dialog(dlg)
+
+    def show_edit_dialog(rid):
+        idx = find_record_idx(rid)
+        if idx is None:
+            return
+        r = records[idx]
+        edit_name = ft.TextField(label="なくした物", value=r.get("name", ""), width=300)
+        edit_location = ft.TextField(label="見つかった場所", value=r.get("location", ""), width=300)
+        edit_lost_date = ft.TextField(
+            label="なくした日", value=r.get("lost_date", ""), width=300,
+            read_only=True,
+            on_focus=lambda _: open_edit_date_picker(edit_lost_date),
+            suffix=ft.TextButton("日付選択", on_click=lambda _: open_edit_date_picker(edit_lost_date)),
+        )
+        edit_cat_opts = [ft.dropdown.Option(c) for c in categories]
+        edit_category = ft.Dropdown(
+            label="カテゴリ", value=r.get("category", "その他"),
+            options=edit_cat_opts, width=300,
+        )
+
+        def open_edit_date_picker(field):
+            def on_pick(e):
+                val = e.control.value
+                if val:
+                    if hasattr(val, "strftime"):
+                        field.value = val.strftime("%Y-%m-%d")
+                    else:
+                        field.value = str(val)[:10]
+                    field.update()
+            dp = ft.DatePicker(on_change=on_pick, first_date=datetime(2000, 1, 1), last_date=datetime.now())
+            page.overlay.append(dp)
+            dp.open = True
+            dp.update()
+
+        def save_edit(e):
+            nonlocal records
+            idx2 = find_record_idx(rid)
+            if idx2 is None:
+                return
+            new_name = edit_name.value.strip()
+            if not new_name:
+                e.page.show_snack_bar(ft.SnackBar(content=ft.Text("名前を入力してください")))
+                return
+            records[idx2]["name"] = new_name
+            records[idx2]["category"] = edit_category.value
+            records[idx2]["location"] = edit_location.value.strip()
+            new_parts = edit_location.value.strip().split(" > ")
+            records[idx2]["location_parts"] = {}
+            if len(new_parts) >= 1:
+                records[idx2]["location_parts"]["room"] = new_parts[0]
+            if len(new_parts) >= 2:
+                records[idx2]["location_parts"]["furniture"] = new_parts[1]
+            if len(new_parts) >= 3:
+                records[idx2]["location_parts"]["spot"] = new_parts[2]
+            records[idx2]["lost_date"] = edit_lost_date.value.strip() or records[idx2].get("lost_date", "")
+            save()
+            dlg.open = False
+            dlg.update()
+            refresh()
+            e.page.show_snack_bar(ft.SnackBar(content=ft.Text("更新しました"), bgcolor=ft.Colors.TEAL_400))
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("記録を編集"),
+            content=ft.Column([
+                edit_name, edit_category, edit_lost_date, edit_location,
+            ], tight=True, spacing=8, scroll=ft.ScrollMode.AUTO),
+            actions=[
+                ft.TextButton("キャンセル", on_click=lambda e: setattr(dlg, 'open', False) or dlg.update()),
+                ft.FilledButton("保存", on_click=save_edit),
+            ],
+        )
+        page.show_dialog(dlg)
+
+    def mark_resolved(rid):
+        nonlocal records
+        idx = find_record_idx(rid)
+        if idx is None:
+            return
         records[idx]["resolved"] = True
         records[idx]["resolution_date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         save()
@@ -448,7 +593,6 @@ def main(page: ft.Page):
             value=data, multiline=True, min_lines=10, max_lines=20,
             width=500, read_only=True,
         )
-
         dlg = ft.AlertDialog(
             modal=True,
             title=ft.Text("データをエクスポート"),
@@ -475,6 +619,7 @@ def main(page: ft.Page):
                 for item in data:
                     if not isinstance(item, dict) or "name" not in item:
                         raise ValueError("各アイテムに name フィールドが必要です")
+                    item.setdefault("id", str(uuid.uuid4()))
                     item.setdefault("category", "その他")
                     item.setdefault("location", "")
                     item.setdefault("location_parts", {})
@@ -596,6 +741,15 @@ def main(page: ft.Page):
         outer = ft.Container(height=8, bgcolor=ft.Colors.AMBER_100, border_radius=4)
         return ft.Stack([outer, inner])
 
+    def make_tappable_btn(label, on_click, color=None):
+        return ft.Container(
+            content=ft.Text(label, size=13, color=color or ft.Colors.TEAL_700, weight=ft.FontWeight.W_500),
+            padding=ft.padding.only(left=8, right=8, top=8, bottom=8),
+            border_radius=6,
+            ink=True,
+            on_click=on_click,
+        )
+
     def refresh():
         nonlocal chips_container, location_chips_container, results_container, simulation_container, history_container, ranking_container
 
@@ -634,8 +788,11 @@ def main(page: ft.Page):
             chips.append(ft.Row([chip], tight=True))
         chips_container.controls = chips
 
-        if results is None:
-            results_container.controls = [ft.Text("アイテムを入力して「探す」を押してください", color=ft.Colors.GREY_500)]
+        if search_loading:
+            results_container.controls = [ft.ProgressBar(color=ft.Colors.TEAL_600)]
+            simulation_container.controls = []
+        elif results is None:
+            results_container.controls = [ft.Text("アイテムを入力して「探す」を押してください", color=ft.Colors.GREY_600)]
             simulation_container.controls = []
         elif not results:
             results_container.controls = [ft.Text("該当する記録がありません", color=ft.Colors.GREY_500)]
@@ -655,8 +812,16 @@ def main(page: ft.Page):
                 rc.append(ft.Text("このアイテムを実際に見つけたら記録しましょう！精度が上がります",
                                   size=11, color=ft.Colors.GREY_500, italic=True))
             rc.append(ft.Divider(height=4))
+
+            matched_records = [r for r in get_filtered() if fuzzy_match(name, r.get("name", ""))]
             for loc, w, pct, is_top in results:
                 color = ft.Colors.TEAL_700 if is_top else ft.Colors.TEAL_600
+                contributing = [r for r in matched_records if r.get("location", "") == loc]
+                contrib_text = ""
+                if contributing:
+                    tops = contributing[:3]
+                    names_list = list(dict.fromkeys(r["name"] for r in tops))
+                    contrib_text = "根拠: " + ", ".join(names_list)
                 card = ft.Container(
                     content=ft.Column([
                         ft.Row([
@@ -665,6 +830,7 @@ def main(page: ft.Page):
                             ft.Text(f"{pct:.0f}%", size=12, weight=ft.FontWeight.BOLD, color=color),
                         ]),
                         make_bar(pct, ft.Colors.TEAL_400 if is_top else ft.Colors.ORANGE_100),
+                        ft.Text(contrib_text, size=10, color=ft.Colors.GREY_500, italic=True) if contrib_text else ft.Container(),
                     ], spacing=2),
                     padding=6,
                     bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.AMBER_50) if is_top else ft.Colors.with_opacity(0.8, ft.Colors.WHITE),
@@ -683,13 +849,13 @@ def main(page: ft.Page):
                         ft.Text("「記録」タブからなくし物を追加しましょう", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
             hc = []
             for i, r in enumerate(reversed(records)):
                 idx = len(records) - 1 - i
+                rid = r.get("id", str(idx))
                 cat = r.get("category", "")
                 loc = r.get("location", "場所不明")
                 fd = r.get("found_date", "")
@@ -700,23 +866,23 @@ def main(page: ft.Page):
                 if resolved:
                     subtitle += " 解決済み"
                 trailing_btns = [
-                    ft.TextButton("探す",
-                        on_click=lambda e, n=r.get("name", ""): search_from_history(n),
-                    ),
+                    make_tappable_btn("編集", lambda e, rid=rid: show_edit_dialog(rid)),
+                    make_tappable_btn("探す",
+                        lambda e, n=r.get("name", ""): search_from_history(n)),
                 ]
                 if not resolved:
-                    trailing_btns.insert(0, ft.TextButton("解決",
-                        on_click=lambda e, i=idx: mark_resolved(i),
-                    ))
-                trailing_btns.append(ft.TextButton("削除",
-                    on_click=lambda e, i=idx: delete_record(i),
-                ))
+                    trailing_btns.insert(1, make_tappable_btn("解決",
+                        lambda e, rid=rid: mark_resolved(rid),
+                        color=ft.Colors.TEAL_600))
+                trailing_btns.append(make_tappable_btn("削除",
+                    lambda e, rid=rid, n=r.get("name", ""): confirm_delete(rid, n),
+                    color=ft.Colors.RED_400))
                 hc.append(
                     ft.Card(
                         ft.ListTile(
                             title=ft.Text(r.get("name", ""), weight=ft.FontWeight.W_500),
                             subtitle=ft.Text(subtitle, size=13),
-                            trailing=ft.Row(trailing_btns, spacing=0),
+                            trailing=ft.Row(trailing_btns, spacing=2),
                         ),
                         margin=3,
                     )
@@ -731,7 +897,6 @@ def main(page: ft.Page):
                         ft.Text("記録が増えるとランキングが表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
         else:
@@ -768,6 +933,7 @@ def main(page: ft.Page):
         ranking_container.update()
 
     def refresh_analysis():
+        nonlocal cal_year, cal_month
         analysis_progress.visible = True
         page.update()
 
@@ -779,7 +945,6 @@ def main(page: ft.Page):
                         ft.Text("記録が増えると分析が表示されます", size=12, color=ft.Colors.GREY_500, italic=True),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
                     padding=20, alignment=ft.Alignment.CENTER,
-                    image=ft.DecorationImage(src=BG_IMAGE, opacity=0.5, fit=ft.BoxFit.COVER),
                 ),
             ]
             analysis_progress.visible = False
@@ -796,7 +961,6 @@ def main(page: ft.Page):
                 lost_by_date.setdefault(d, []).append(r)
 
         min_d = datetime.now()
-        max_d = datetime.now()
         if lost_by_date:
             dates = [d for d in lost_by_date if d]
             valid_dates = []
@@ -807,9 +971,6 @@ def main(page: ft.Page):
                     pass
             if valid_dates:
                 min_d = min(valid_dates)
-
-        cal_year = getattr(refresh_analysis, "cal_year", max_d.year)
-        cal_month = getattr(refresh_analysis, "cal_month", max_d.month)
 
         cal_header = ft.Row([
             ft.TextButton("<", on_click=lambda e: _navigate_cal(-1)),
@@ -1024,17 +1185,14 @@ def main(page: ft.Page):
         page.update()
 
     def _navigate_cal(delta):
-        cy = getattr(refresh_analysis, "cal_year", datetime.now().year)
-        cm = getattr(refresh_analysis, "cal_month", datetime.now().month)
-        cm += delta
-        if cm > 12:
-            cm = 1
-            cy += 1
-        elif cm < 1:
-            cm = 12
-            cy -= 1
-        refresh_analysis.cal_year = cy
-        refresh_analysis.cal_month = cm
+        nonlocal cal_year, cal_month
+        cal_month += delta
+        if cal_month > 12:
+            cal_month = 1
+            cal_year += 1
+        elif cal_month < 1:
+            cal_month = 12
+            cal_year -= 1
         refresh_analysis()
 
     def _show_day_detail(date_str, day_records):
@@ -1428,11 +1586,13 @@ def main(page: ft.Page):
         label="カテゴリで絞り込み",
         options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in categories]),
         width=300,
-        on_select=on_search_cat_change,
+        on_change=on_search_cat_change,
     )
 
     search_view = ft.Column([
-        ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
+        ft.Row([
+            ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
+        ]),
         ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
         ft.Divider(height=8),
         search_dropdown,
@@ -1442,7 +1602,7 @@ def main(page: ft.Page):
         ]),
         chips_container,
         ft.Divider(height=8),
-        results_container,
+        ft.Container(content=results_container, expand=True),
         ft.Divider(height=8),
         simulation_container,
     ], scroll=ft.ScrollMode.AUTO, spacing=12)
@@ -1450,7 +1610,10 @@ def main(page: ft.Page):
     def on_date_selected(e):
         val = e.control.value
         if val:
-            date_ref.current.value = val.strftime("%Y-%m-%d")
+            if hasattr(val, "strftime"):
+                date_ref.current.value = val.strftime("%Y-%m-%d")
+            else:
+                date_ref.current.value = str(val)[:10]
             date_ref.current.update()
 
     date_picker = ft.DatePicker(
@@ -1489,11 +1652,13 @@ def main(page: ft.Page):
             ),
         ]),
         ft.TextField(ref=location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
-        ft.Row([
+        ft.Column([
             location_chips_container,
-            ft.TextButton("間取りから選ぶ", on_click=show_floorplan_selector,
-                          style=ft.ButtonStyle(color=ft.Colors.TEAL_700)),
-        ], alignment=ft.MainAxisAlignment.START),
+            ft.Row([
+                ft.TextButton("間取りから選ぶ", on_click=show_floorplan_selector,
+                              style=ft.ButtonStyle(color=ft.Colors.TEAL_700)),
+            ]),
+        ]),
         ft.ElevatedButton("記録する", on_click=on_add_record),
         ft.Divider(height=16),
         ft.Row([
@@ -1507,7 +1672,6 @@ def main(page: ft.Page):
     ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
     ranking_view = ft.Column([ranking_container], scroll=ft.ScrollMode.AUTO, spacing=12)
-
     analysis_view = ft.Column([analysis_progress, analysis_container], scroll=ft.ScrollMode.AUTO, spacing=12)
 
     tabs = ft.Tabs(
@@ -1548,19 +1712,25 @@ def main(page: ft.Page):
         ],
     )
 
+    def on_page_load(e):
+        refresh()
+
     page.overlay.append(date_picker)
     page.add(ft.Stack([
-        ft.Container(expand=True, image=ft.DecorationImage(src=BG_IMAGE, opacity=1.0, fit=ft.BoxFit.COVER)),
-        ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.55, ft.Colors.WHITE)),
+        ft.Container(expand=True, gradient=ft.LinearGradient(
+            begin=ft.Alignment.TOP_LEFT, end=ft.Alignment.BOTTOM_RIGHT,
+            colors=[ft.Colors.AMBER_50, ft.Colors.TEAL_50],
+        )),
+        ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE)),
         ft.SafeArea(expand=True, content=tabs),
     ], expand=True))
 
     page.update()
     load_from_storage()
+    ensure_record_ids()
     refresh()
     build_floorplan_grid()
-
-    page.on_load = lambda e: refresh()
+    page.on_load = on_page_load
 
 
 ft.run(main, view=ft.AppView.WEB_BROWSER)
