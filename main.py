@@ -1,139 +1,16 @@
 from datetime import datetime
-from collections import Counter, defaultdict
-import json
-import unicodedata
+from collections import Counter
 import calendar
-import math
+import json
 import uuid
-import random
 
 import flet as ft
 
-STORAGE_KEY = "lost_items_v4"
-CATEGORIES_KEY = "lost_items_categories_v1"
-FLOORPLAN_KEY = "lost_items_floorplan_v1"
-MAX_GRID = 30
-DEFAULT_CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
-WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
-
-DEFAULT_TENDENCIES = {
-    "財布": ["ズボンのポケット", "カバンの中", "机の上", "ベッドの上"],
-    "鍵": ["玄関の鍵穴", "カバンの中", "机の上", "ポケット"],
-    "スマホ": ["布団の隙間", "ソファの隙間", "机の上", "ベッドの上"],
-    "イヤホン": ["ポケット", "カバンの中", "机の上", "ベッドの上"],
-    "傘": ["玄関", "会社/学校", "電車の中", "駐輪場"],
-    "本": ["机の上", "カバンの中", "ベッドの上", "リビング"],
-    "文房具": ["机の上", "カバンの中", "引き出しの中"],
-    "衣類": ["洗濯機", "クローゼット", "ハンガー"],
-    "カバン": ["玄関", "机の上", "車の中", "会社/学校"],
-    "その他": ["ポケット", "カバンの中", "机の上", "ソファの隙間"],
-}
-
-# グラフ伝搬定数
-RWR_ALPHA = 0.3
-RWR_ITERATIONS = 20
-RWR_CONVERGENCE = 1e-8
-LOC_SIM_THRESHOLD = 0.15
-LOC_SIM_DECAY = 0.3
-LOC_TEMPORAL_WEIGHT = 0.4
-LOC_TEMPORAL_BASE = 0.6
-RECENCY_HALFLIFE_DAYS = 30
-DOW_WEIGHTS = {0: 1.0, 1: 0.5, 6: 0.5}
-DOW_OTHER = 0.2
-HOUR_SIGMA_SQ = 18
-RELATED_SCORE_THRESHOLD = 0.01
-
-_js_window = None
-try:
-    from js import window as _js_window
-except Exception:
-    pass
-
-
-def fuzzy_match(query: str, text: str) -> bool:
-    q = unicodedata.normalize("NFKC", query.strip().lower())
-    t = unicodedata.normalize("NFKC", text.strip().lower())
-    return bool(q) and (q in t)
-
-
-def parse_weekday(d: str):
-    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y/%m/%d", "%m-%d", "%m/%d"):
-        try:
-            return datetime.strptime(d, fmt).weekday()
-        except ValueError:
-            pass
-    return None
-
-
-def parse_dt(s):
-    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(s, fmt)
-        except ValueError:
-            pass
-    return None
-
-
-def _ls_get(key):
-    if _js_window is not None:
-        try:
-            return _js_window.localStorage.getItem(key)
-        except Exception:
-            pass
-    return None
-
-
-def _ls_set(key, val):
-    if _js_window is not None:
-        try:
-            _js_window.localStorage.setItem(key, val)
-            return True
-        except Exception:
-            pass
-    return False
-
-
-def load_categories():
-    raw = _ls_get(CATEGORIES_KEY)
-    if raw:
-        try:
-            cats = json.loads(raw)
-            if isinstance(cats, list) and len(cats) > 0:
-                return cats
-        except Exception:
-            pass
-    return DEFAULT_CATEGORIES[:]
-
-
-def save_categories(cats):
-    _ls_set(CATEGORIES_KEY, json.dumps(cats, ensure_ascii=False))
-
-
-def load_floorplan():
-    raw = _ls_get(FLOORPLAN_KEY)
-    if raw:
-        try:
-            fp = json.loads(raw)
-            if isinstance(fp, dict) and "rows" in fp and "cols" in fp:
-                return fp
-        except Exception:
-            pass
-    return {"name": "マイ間取り", "rows": 3, "cols": 3, "cell_size": 80, "cells": []}
-
-
-def save_floorplan(fp):
-    _ls_set(FLOORPLAN_KEY, json.dumps(fp, ensure_ascii=False))
-
-
-def migrate_floorplan_cells(cells):
-    changed = False
-    for cell in cells:
-        if "spots" in cell and "furniture" not in cell:
-            old = cell.pop("spots", "")
-            cell["furniture"] = [{"name": "その他", "spots": [s.strip() for s in old.split(",") if s.strip()]}] if old.strip() else []
-            changed = True
-        cell.setdefault("furniture", [])
-    return changed
+from constants import MAX_GRID, WEEKDAYS_JP
+import constants
+import utils
+import storage
+import predict
 
 
 def main(page: ft.Page):
@@ -151,12 +28,20 @@ def main(page: ft.Page):
         use_material3=True,
     )
 
-    records = []
-    categories = load_categories()
-    floorplan = load_floorplan()
+    records = storage.load_records(page)
+    needs_save = False
+    for r in records:
+        if "id" not in r:
+            r["id"] = str(uuid.uuid4())
+            needs_save = True
+    if needs_save:
+        storage.save_records(page, records)
+
+    categories = storage.load_categories()
+    floorplan = storage.load_floorplan()
     floorplan.setdefault("cell_size", 80)
-    if migrate_floorplan_cells(floorplan.get("cells", [])):
-        save_floorplan(floorplan)
+    if storage.migrate_floorplan_cells(floorplan.get("cells", [])):
+        storage.save_floorplan(floorplan)
     search_val = ""
     search_cat = ""
     results = None
@@ -183,213 +68,11 @@ def main(page: ft.Page):
     analysis_progress = ft.ProgressBar(visible=False, color=ft.Colors.TEAL_600)
     floorplan_grid_container = ft.Column(spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
-    def load_from_storage():
-        nonlocal records
-        raw = _ls_get(STORAGE_KEY)
-        if raw is not None:
-            try:
-                data = json.loads(raw)
-                if isinstance(data, list):
-                    records = data
-                    return
-            except Exception:
-                pass
-        try:
-            raw = page.client_storage.get(STORAGE_KEY)
-            if raw and isinstance(raw, list):
-                records = raw
-        except Exception:
-            pass
-
-    def ensure_record_ids():
-        nonlocal records
-        changed = False
-        for r in records:
-            if "id" not in r:
-                r["id"] = str(uuid.uuid4())
-                changed = True
-        if changed:
-            save()
-
-    def save():
-        raw = json.dumps(records, ensure_ascii=False)
-        if _ls_set(STORAGE_KEY, raw):
-            return True
-        try:
-            page.client_storage.set(STORAGE_KEY, records)
-            return True
-        except Exception:
-            return False
-
     def get_filtered():
         nonlocal search_cat
         if not search_cat:
             return records
         return [r for r in records if r.get("category", "") == search_cat]
-
-    def get_default_tendencies(query):
-        for name, places in DEFAULT_TENDENCIES.items():
-            if fuzzy_match(query, name):
-                total = len(places)
-                return [(p, 1, 100 / total, i == 0) for i, p in enumerate(places)]
-        return None
-
-    def build_name_to_category():
-        name_to_cat = {}
-        cat_counts = defaultdict(Counter)
-        for r in records:
-            name = r.get("name", "")
-            cat = r.get("category", "")
-            if name and cat:
-                cat_counts[name][cat] += 1
-        for name, counts in cat_counts.items():
-            name_to_cat[name] = counts.most_common(1)[0][0]
-        return name_to_cat
-
-    def build_item_loc_graph(records_slice):
-        item_to_loc = defaultdict(Counter)
-        loc_to_item = defaultdict(Counter)
-        for r in records_slice:
-            name = r.get("name", "")
-            loc = r.get("location", "")
-            if name and loc:
-                item_to_loc[name][loc] += 1
-                loc_to_item[loc][name] += 1
-        return item_to_loc, loc_to_item
-
-    def build_loc_sim_graph(records_slice):
-        loc_items = defaultdict(set)
-        for r in records_slice:
-            loc = r.get("location", "")
-            name = r.get("name", "")
-            if loc and name:
-                loc_items[loc].add(name)
-        locs = list(loc_items.keys())
-        graph = defaultdict(dict)
-        for i, l1 in enumerate(locs):
-            for l2 in locs[i+1:]:
-                inter = loc_items[l1] & loc_items[l2]
-                union = loc_items[l1] | loc_items[l2]
-                j = len(inter) / len(union) if union else 0
-                if j >= LOC_SIM_THRESHOLD:
-                    graph[l1][l2] = j
-                    graph[l2][l1] = j
-        return graph
-
-    def unified_predict(query_name):
-        if not query_name:
-            return None, ""
-        pool = get_filtered()
-        item_to_loc, loc_to_item = build_item_loc_graph(pool)
-        loc_sim = build_loc_sim_graph(pool)
-
-        if not item_to_loc:
-            defaults = get_default_tendencies(query_name)
-            if defaults:
-                return defaults, "一般的な傾向から予測（まだ記録がありません）"
-            return [], ""
-
-        matched = [n for n in item_to_loc if fuzzy_match(query_name, n)]
-        seeds = matched[:]
-        if not seeds:
-            ntc = build_name_to_category()
-            q_cat = None
-            for n, c in ntc.items():
-                if fuzzy_match(query_name, n):
-                    q_cat = c
-                    break
-            if q_cat:
-                seeds = [n for n in item_to_loc if ntc.get(n) == q_cat]
-        has_direct = bool(matched)
-        if not seeds:
-            defaults = get_default_tendencies(query_name)
-            if defaults:
-                return defaults, "一般的な傾向から予測（まだ記録がありません）"
-            return [], ""
-
-        item_scores = defaultdict(float)
-        for s in seeds:
-            item_scores[s] = 1.0 / len(seeds)
-        location_scores = defaultdict(float)
-
-        for _ in range(RWR_ITERATIONS):
-            nls = defaultdict(float)
-            for item, sc in item_scores.items():
-                if sc == 0:
-                    continue
-                nbrs = item_to_loc.get(item, {})
-                total = sum(nbrs.values())
-                if total > 0:
-                    for loc, w in nbrs.items():
-                        nls[loc] += sc * w / total
-            for loc, sc in list(nls.items()):
-                for sl, sj in loc_sim.get(loc, {}).items():
-                    nls[sl] += sc * sj * LOC_SIM_DECAY
-            nis = defaultdict(float)
-            for loc, sc in nls.items():
-                nbrs = loc_to_item.get(loc, {})
-                total = sum(nbrs.values())
-                if total > 0:
-                    for item, w in nbrs.items():
-                        nis[item] += sc * w / total
-            for item in list(item_scores.keys()) + list(nis.keys()):
-                nis[item] = (1 - RWR_ALPHA) * nis.get(item, 0)
-            for s in seeds:
-                nis[s] += RWR_ALPHA / len(seeds)
-            diff = sum(abs(nis.get(k, 0) - v) for k, v in item_scores.items())
-            item_scores = nis
-            location_scores = nls
-            if diff < RWR_CONVERGENCE:
-                break
-
-        if not location_scores:
-            defaults = get_default_tendencies(query_name)
-            if defaults:
-                return defaults, "一般的な傾向から予測（まだ記録がありません）"
-            return [], ""
-
-        now = datetime.now()
-        cdow = now.weekday()
-        chour = now.hour
-        loc_temporal = Counter()
-        for r in pool:
-            loc = r.get("location", "")
-            if loc not in location_scores:
-                continue
-            fd = r.get("found_date", "")
-            dt = parse_dt(fd)
-            if not dt:
-                continue
-            dw = DOW_WEIGHTS.get(abs(dt.weekday() - cdow), DOW_OTHER)
-            hw = math.exp(-abs(dt.hour - chour) ** 2 / HOUR_SIGMA_SQ)
-            rw = 0.5 ** ((now - dt).days / RECENCY_HALFLIFE_DAYS)
-            loc_temporal[loc] += dw * hw * rw
-
-        t_total = sum(loc_temporal.values()) or 1
-        combined = {}
-        for loc, gs in location_scores.items():
-            tw = loc_temporal.get(loc, 0.5) / t_total * len(loc_temporal)
-            combined[loc] = gs * (LOC_TEMPORAL_BASE + LOC_TEMPORAL_WEIGHT * min(tw, 3) / 3)
-
-        total = sum(combined.values())
-        if total == 0:
-            defaults = get_default_tendencies(query_name)
-            if defaults:
-                return defaults, "一般的な傾向から予測（まだ記録がありません）"
-            return [], ""
-
-        results_list = []
-        for loc, sc in sorted(combined.items(), key=lambda x: -x[1]):
-            pct = sc / total * 100
-            results_list.append((loc, round(sc, 1), pct, False))
-        if results_list:
-            mp = max(r[2] for r in results_list)
-            results_list = [(l, w, p, p == mp) for l, w, p, _ in results_list]
-
-        n_related = len([n for n, sc in item_scores.items() if n not in seeds and sc > RELATED_SCORE_THRESHOLD])
-        kind = "同カテゴリ" if not has_direct else "直接一致"
-        ctx = f"グラフ伝搬（{kind}）: 起点{len(seeds)} + 関連{n_related}"
-        return results_list, ctx
 
     def search_from_history(name):
         nonlocal search_val, results, search_context_info, search_loading
@@ -398,7 +81,7 @@ def main(page: ft.Page):
         search_ref.current.update()
         search_loading = True
         refresh()
-        results, search_context_info = unified_predict(name)
+        results, search_context_info = predict.unified_predict(name, records, search_cat)
         search_loading = False
         tabs.selected_index = 0
         tabs.update()
@@ -415,7 +98,7 @@ def main(page: ft.Page):
         search_val = q
         search_loading = True
         refresh()
-        results, search_context_info = unified_predict(q)
+        results, search_context_info = predict.unified_predict(q, records, search_cat)
         search_loading = False
         refresh()
 
@@ -457,7 +140,7 @@ def main(page: ft.Page):
             "resolution_date": None,
         }
         records = records + [rec]
-        if not save():
+        if not storage.save_records(page, records):
             e.page.show_snack_bar(ft.SnackBar(
                 content=ft.Text("保存に失敗しました"), bgcolor=ft.Colors.RED_400))
             return
@@ -483,7 +166,7 @@ def main(page: ft.Page):
         idx = find_record_idx(rid)
         if idx is not None:
             records.pop(idx)
-            save()
+            storage.save_records(page, records)
             refresh()
 
     def confirm_delete(rid, name):
@@ -556,7 +239,7 @@ def main(page: ft.Page):
             if len(new_parts) >= 3:
                 records[idx2]["location_parts"]["spot"] = new_parts[2]
             records[idx2]["lost_date"] = edit_lost_date.value.strip() or records[idx2].get("lost_date", "")
-            save()
+            storage.save_records(page, records)
             dlg.open = False
             dlg.update()
             refresh()
@@ -582,7 +265,7 @@ def main(page: ft.Page):
             return
         records[idx]["resolved"] = True
         records[idx]["resolution_date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        save()
+        storage.save_records(page, records)
         page.show_snack_bar(ft.SnackBar(
             content=ft.Text(f"「{records[idx].get('name', '')}」を見つかりました！"), bgcolor=ft.Colors.TEAL_400))
         refresh()
@@ -628,7 +311,7 @@ def main(page: ft.Page):
                     item.setdefault("resolved", False)
                     item.setdefault("resolution_date", None)
                 records = data
-                save()
+                storage.save_records(page, records)
                 dlg.open = False
                 dlg.update()
                 ev.page.show_snack_bar(ft.SnackBar(
@@ -659,7 +342,6 @@ def main(page: ft.Page):
         e.page.show_dialog(dlg)
 
     def rebuild_category_dropdowns():
-        nonlocal categories
         opts = [ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in categories]
         if search_dropdown_ref.current:
             search_dropdown_ref.current.options = opts
@@ -695,7 +377,7 @@ def main(page: ft.Page):
             nonlocal categories
             cats.pop(idx)
             categories = cats[:]
-            save_categories(categories)
+            storage.save_categories(categories)
             refresh_cat_ui()
             rebuild_category_dropdowns()
 
@@ -710,7 +392,7 @@ def main(page: ft.Page):
                 return
             cats.append(name)
             categories = cats[:]
-            save_categories(categories)
+            storage.save_categories(categories)
             cat_input.value = ""
             cat_input.update()
             refresh_cat_ui()
@@ -813,7 +495,7 @@ def main(page: ft.Page):
                                   size=11, color=ft.Colors.GREY_500, italic=True))
             rc.append(ft.Divider(height=4))
 
-            matched_records = [r for r in get_filtered() if fuzzy_match(name, r.get("name", ""))]
+            matched_records = [r for r in get_filtered() if utils.fuzzy_match(name, r.get("name", ""))]
             for loc, w, pct, is_top in results:
                 color = ft.Colors.TEAL_700 if is_top else ft.Colors.TEAL_600
                 contributing = [r for r in matched_records if r.get("location", "") == loc]
@@ -1249,6 +931,7 @@ def main(page: ft.Page):
 
     def edit_cell_dialog(r, c):
         nonlocal floorplan
+
         def find_cell():
             return next((x for x in floorplan.get("cells", []) if x.get("r") == r and x.get("c") == c), None)
         existing = find_cell()
@@ -1303,7 +986,7 @@ def main(page: ft.Page):
             cell = find_cell()
             if cell and fi < len(cell.get("furniture", [])):
                 cell["furniture"].pop(fi)
-                save_floorplan(floorplan)
+                storage.save_floorplan(floorplan)
                 rebuild_furniture_ui()
 
         def delete_spot(fi, si):
@@ -1312,11 +995,12 @@ def main(page: ft.Page):
                 spots = cell["furniture"][fi].get("spots", [])
                 if si < len(spots):
                     spots.pop(si)
-                    save_floorplan(floorplan)
+                    storage.save_floorplan(floorplan)
                     rebuild_furniture_ui()
 
         def add_furniture_dialog(ev):
             furn_input = ft.TextField(label="家具名", hint_text="例: ソファ, 机, 本棚", width=250)
+
             def confirm(ev2):
                 name = furn_input.value.strip()
                 if not name:
@@ -1327,7 +1011,7 @@ def main(page: ft.Page):
                     floorplan["cells"].append({"r": r, "c": c, "room": room_input.value.strip() or "部屋", "furniture": []})
                     cell = floorplan["cells"][-1]
                 cell.setdefault("furniture", []).append({"name": name, "spots": []})
-                save_floorplan(floorplan)
+                storage.save_floorplan(floorplan)
                 sub_dlg.open = False
                 sub_dlg.update()
                 rebuild_furniture_ui()
@@ -1343,6 +1027,7 @@ def main(page: ft.Page):
 
         def add_spot_dialog(furn_name):
             spot_input = ft.TextField(label="スポット名", hint_text="例: 隙間, 天板, 引き出し", width=250)
+
             def confirm(ev2):
                 name = spot_input.value.strip()
                 if not name:
@@ -1354,7 +1039,7 @@ def main(page: ft.Page):
                         if f.get("name") == furn_name:
                             f.setdefault("spots", []).append(name)
                             break
-                    save_floorplan(floorplan)
+                    storage.save_floorplan(floorplan)
                     sub_dlg.open = False
                     sub_dlg.update()
                     rebuild_furniture_ui()
@@ -1379,7 +1064,7 @@ def main(page: ft.Page):
                 cell["room"] = room
             else:
                 floorplan["cells"].append({"r": r, "c": c, "room": room, "furniture": []})
-            save_floorplan(floorplan)
+            storage.save_floorplan(floorplan)
             dlg.open = False
             dlg.update()
             build_floorplan_grid()
@@ -1387,7 +1072,7 @@ def main(page: ft.Page):
         def delete_cell(ev):
             nonlocal floorplan
             floorplan["cells"] = [x for x in floorplan.get("cells", []) if not (x.get("r") == r and x.get("c") == c)]
-            save_floorplan(floorplan)
+            storage.save_floorplan(floorplan)
             dlg.open = False
             dlg.update()
             build_floorplan_grid()
@@ -1421,7 +1106,7 @@ def main(page: ft.Page):
         floorplan["cells"] = new_cells
         if cell_size is not None:
             floorplan["cell_size"] = cell_size
-        save_floorplan(floorplan)
+        storage.save_floorplan(floorplan)
         build_floorplan_grid()
 
     def show_floorplan_selector(e):
@@ -1726,8 +1411,6 @@ def main(page: ft.Page):
     ], expand=True))
 
     page.update()
-    load_from_storage()
-    ensure_record_ids()
     refresh()
     build_floorplan_grid()
     page.on_load = on_page_load
