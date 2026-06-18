@@ -1586,7 +1586,7 @@ def main(page: ft.Page):
         label="カテゴリで絞り込み",
         options=([ft.dropdown.Option("", "すべて")] + [ft.dropdown.Option(c) for c in categories]),
         width=300,
-        on_change=on_search_cat_change,
+        on_select=on_search_cat_change,
     )
 
     search_view = ft.Column([
