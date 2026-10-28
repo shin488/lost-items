@@ -459,28 +459,6 @@ RECENCY_HALFLIFE_DAYS = 30
 
 ---
 
-## 18. 参考文献・参考資料
-
-### 書籍・論文
-
-- 農林水産省（2024）食品ロス量の推計結果（令和4年度）— 背景検討のため参照。
-
-### Webサイト
-
-- Flet公式ドキュメント：https://flet.dev
-- Pyodide公式：https://pyodide.org
-- GitHub公式：GitHub Pages / GitHub Actions
-
-### 使用したソフトウェア・ライブラリ
-
-- Flet / Flutter（Apache License 2.0）、Pyodide（BSDライセンス）、GitHub Pages、GitHub Actions。
-
-### 使用した生成AI
-
-- 本報告書の執筆支援・コード補助に生成AIを利用した（詳細は第19章）。
-
----
-
 ## 19. 生成AI利用記録
 
 ### 19.1 生成AIを利用した作業
