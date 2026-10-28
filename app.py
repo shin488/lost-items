@@ -35,6 +35,11 @@ class LostItemsApp(
             use_material3=True,
         )
 
+        # 手書き風フォント（Caveat）を読み込む
+        self.page.fonts = {
+            "Caveat": "https://fonts.gstatic.com/s/caveat/v23/WnznHAc5bAfYB2QRah7pcpNvOx-pjfJ9SII.ttf",
+        }
+
         self.records = storage.load_records(page)
         needs_save = False
         for r in self.records:
@@ -130,9 +135,9 @@ class LostItemsApp(
 
         search_view = ft.Column([
             ft.Row([
-                ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
+                ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True, font_family="Caveat"),
             ]),
-            ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD),
+            ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD, font_family="Caveat"),
             ft.Divider(height=8),
             search_dropdown,
             ft.Row([
@@ -149,7 +154,7 @@ class LostItemsApp(
 
         record_view = ft.Column([
             ft.Text("見つけたらすぐに記録しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
-            ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD),
+            ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD, font_family="Caveat"),
             ft.Divider(height=8),
             ft.TextField(ref=self.name_ref, label="なくした物", hint_text="例: 鍵、スマホ、財布", width=300),
             ft.Dropdown(
@@ -194,7 +199,7 @@ class LostItemsApp(
         ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
         floorplan_view = ft.Column([
-            ft.Text("間取りを設定", size=22, weight=ft.FontWeight.BOLD),
+            ft.Text("間取りを設定", size=22, weight=ft.FontWeight.BOLD, font_family="Caveat"),
             ft.Text("セルをタップして編集", size=12, color=ft.Colors.GREY_600, italic=True),
             ft.Divider(height=8),
             ft.Row([
@@ -254,7 +259,7 @@ class LostItemsApp(
         )
 
         page.appbar = ft.AppBar(
-            title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD)], tight=True),
+            title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD, font_family="Caveat")], tight=True),
             bgcolor=ft.Colors.TEAL_800,
             color=ft.Colors.WHITE,
             center_title=True,

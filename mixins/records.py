@@ -380,7 +380,7 @@ class RecordsMixin:
         name_counts = Counter(r.get("name", "") for r in self.records if r.get("name", "")).most_common()
         total = len(self.records)
         rc = [
-            ft.Text("よくなくした物ランキング", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800),
+            ft.Text("よくなくした物ランキング", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800, font_family="Caveat"),
             ft.Text(f"全 {total} 件の記録", size=12, color=ft.Colors.GREY_600, italic=True),
             ft.Divider(height=8),
         ]
