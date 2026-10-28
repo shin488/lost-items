@@ -534,3 +534,29 @@ bash scripts/patch-pwa.sh
 ### 20.5 関連ファイル
 
 - `main.py`, `app.py`, `mixins/`, `predict.py`, `storage.py`, `constants.py`, `utils.py`, `ui_components.py`, `README.md`（フローチャート）, `.github/workflows/deploy.yml`, `scripts/patch-pwa.sh`, `pwa/`。
+
+## フローチャート（報告書用）
+
+以下は、本卒業制作報告書の内容をフローチャートとして整理したものである。
+（アプリ操作フローの図はルートの `README.md` 側にあるため、ここでは報告書自体の流れを示す。）
+
+### 1. 開発プロセス全体
+
+```mermaid
+flowchart TD
+    A["企画・背景の把握"] --> B["要件・設計"]
+    B --> C["実装<br/>Flet / Pyodide / RWR"]
+    C --> D["テスト・評価"]
+    D --> E["まとめ・報告書作成"]
+    E --> F["公開・デプロイ"]
+```
+
+### 2. 今後の目標への流れ
+
+```mermaid
+flowchart TD
+    A["現状: データはlocalStorageに保持<br/>（単独利用）"] --> B["目標: データを保持できる基盤"]
+    C["現状: 単独利用"] --> D["目標: 複数人で共有"]
+    B --> E["長期蓄積・バックアップ・同期"]
+    D --> F["家族・共同生活単位の共有"]
+```
