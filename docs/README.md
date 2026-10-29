@@ -205,17 +205,6 @@ RECENCY_HALFLIFE_DAYS = 30
 
 ## 10. 制作過程
 
-### 10.1 制作スケジュール
-
-| 時期 | 実施内容 | 成果・課題 |
-|---|---|---|
-| 2026年5月 | 企画・設計 | 忘れ物探知機の企画・画面構成・推論要件の検討 |
-| 2026年6月 | 実装 | Flet Web / Pyodideでの基本UI実装 |
-| 2026年7月 | 実装 | UIをクラス＋Mixinへ分割（Search / Records / Floorplan / Analysis / Refresh） |
-| 2026年8月 | 推論 | predict.py（RWR・類似度・時刻加重）を実装 |
-| 2026年9月 | 検証・PWA | Service Worker・パッチ・PWA設定 |
-| 2026年10月 | 公開 | GitHub Pagesデプロイ・Playwrightテスト |
-
 ### 10.2 制作中に発生した問題
 
 - 問題：Flet 0.85.2で白画面となる操作が多数あった（Column/TabBar等のbgcolor指定、NavigationBar/Dismissibleの使用、page.bgcolor等）。
