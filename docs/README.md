@@ -6,7 +6,7 @@
 
 - **作品名**：なくしもの探知機（Lost Items Finder）
 - **英語タイトル**：Lost Items Finder: Predicting Where Lost Household Items Are
-- **制作者名**：瑞穂太郎（みずほたろう）
+- **制作者名**：自分
 - **学籍番号**：非公開（個人情報保護のため、公開する報告書には記載しない）
 - **所属ゼミ・研究室**：kklab
 - **制作期間**：2026年4月〜2026年10月
