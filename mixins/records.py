@@ -340,12 +340,12 @@ class RecordsMixin:
             if resolved:
                 subtitle += " 解決済み"
             trailing_btns = [
-                make_tappable_btn("編集", lambda e, rid=rid: self.show_edit_dialog(rid)),
                 make_tappable_btn("探す",
                     lambda e, n=r.get("name", ""): self.search_from_history(n)),
+                make_tappable_btn("編集", lambda e, rid=rid: self.show_edit_dialog(rid)),
             ]
             if not resolved:
-                trailing_btns.insert(1, make_tappable_btn("解決",
+                trailing_btns.append(make_tappable_btn("解決",
                     lambda e, rid=rid: self.mark_resolved(rid),
                     color=ft.Colors.TEAL_600))
             trailing_btns.append(make_tappable_btn("削除",
