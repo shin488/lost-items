@@ -140,9 +140,9 @@ class LostItemsApp(
 
         search_view = ft.Column([
             ft.Row([
-                ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color="#2d8a4e", italic=True, font_family="Inter"),
+                ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color="#ffffff", italic=True, font_family="Inter"),
             ]),
-            ft.Text("なくしものを探す", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#1a7f9a"),
+            ft.Text("なくしものを探す", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#ffffff"),
             ft.Divider(height=8),
             search_dropdown,
             ft.Row([
@@ -158,8 +158,8 @@ class LostItemsApp(
         ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
         record_view = ft.Column([
-            ft.Text("見つけたらすぐに記録しましょう", size=13, color="#2d8a4e", italic=True, font_family="Inter"),
-            ft.Text("新しい記録", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#1a7f9a"),
+            ft.Text("見つけたらすぐに記録しましょう", size=13, color="#ffffff", italic=True, font_family="Inter"),
+            ft.Text("新しい記録", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#ffffff"),
             ft.Divider(height=8),
             ft.TextField(ref=self.name_ref, label="なくした物", hint_text="例: 鍵、スマホ、財布", width=300),
             ft.Dropdown(
@@ -204,7 +204,7 @@ class LostItemsApp(
         ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
         floorplan_view = ft.Column([
-            ft.Text("間取りを設定", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#1a7f9a"),
+            ft.Text("間取りを設定", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#ffffff"),
             ft.Text("セルをタップして編集", size=12, color=ft.Colors.GREY_600, italic=True),
             ft.Divider(height=8),
             ft.Row([
@@ -265,7 +265,7 @@ class LostItemsApp(
 
         page.appbar = ft.AppBar(
             title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD, font_family="Playfair Display")], tight=True),
-            bgcolor="#1a7f9a",
+            bgcolor="#0e3b4f",
             color=ft.Colors.WHITE,
             center_title=True,
             actions=[
@@ -280,7 +280,7 @@ class LostItemsApp(
         page.add(ft.Stack([
             ft.Container(expand=True, gradient=ft.LinearGradient(
                 begin=ft.Alignment.TOP_LEFT, end=ft.Alignment.BOTTOM_RIGHT,
-                colors=["#cdeaf5", "#f7e9da"],
+                colors=["#0e3b4f", "#1a7f9a"],
             )),
             ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE)),
             ft.SafeArea(expand=True, content=tabs),
