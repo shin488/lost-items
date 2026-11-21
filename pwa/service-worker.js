@@ -1,4 +1,4 @@
-const CACHE = "lost-items-v1"
+const CACHE = "lost-items-v2"
 const PRECACHE = [
   ".",
   "./index.html",
