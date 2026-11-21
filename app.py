@@ -36,23 +36,6 @@ class LostItemsApp(
                 surface_container="#ffffff",
             ),
             use_material3=True,
-            text_theme=ft.TextTheme(
-                display_large=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                display_medium=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                display_small=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                headline_large=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                headline_medium=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                headline_small=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                title_large=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                title_medium=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                title_small=ft.TextStyle(font_family="Playfair Display", weight=ft.FontWeight.BOLD, color="#ffffff"),
-                body_large=ft.TextStyle(font_family="Inter", color="#ffffff"),
-                body_medium=ft.TextStyle(font_family="Inter", color="#ffffff"),
-                body_small=ft.TextStyle(font_family="Inter", color="#ffffff"),
-                label_large=ft.TextStyle(font_family="Inter", color="#ffffff"),
-                label_medium=ft.TextStyle(font_family="Inter", color="#ffffff"),
-                label_small=ft.TextStyle(font_family="Inter", color="#ffffff"),
-            ),
         )
 
         # フォントを読み込む（Playfair Display / Inter / Caveat）
