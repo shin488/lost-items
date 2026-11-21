@@ -25,19 +25,24 @@ class LostItemsApp(
 
         page.theme = ft.Theme(
             color_scheme=ft.ColorScheme(
-                primary=ft.Colors.TEAL_800,
-                primary_container=ft.Colors.TEAL_100,
-                secondary=ft.Colors.BROWN_700,
-                secondary_container=ft.Colors.AMBER_50,
-                surface=ft.Colors.WHITE,
-                surface_container=ft.Colors.AMBER_50,
+                primary="#ff6b6b",
+                on_primary="#ffffff",
+                primary_container="#ffe3e3",
+                secondary="#2d8a4e",
+                on_secondary="#ffffff",
+                secondary_container="#e2f2e7",
+                surface="#fff8f0",
+                on_surface="#1a1a2e",
+                surface_container="#ffffff",
             ),
             use_material3=True,
         )
 
-        # 手書き風フォント（Caveat）を読み込む
+        # フォントを読み込む（Playfair Display / Inter / Caveat）
         self.page.fonts = {
             "Caveat": "https://fonts.gstatic.com/s/caveat/v23/WnznHAc5bAfYB2QRah7pcpNvOx-pjfJ9SII.ttf",
+            "Playfair Display": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvUDQ.ttf",
+            "Inter": "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyeMZg.ttf",
         }
 
         self.records = storage.load_records(page)
@@ -135,9 +140,9 @@ class LostItemsApp(
 
         search_view = ft.Column([
             ft.Row([
-                ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color=ft.Colors.TEAL_700, italic=True, font_family="Caveat"),
+                ft.Text("焦らず、ゆっくり思い出しましょう", size=13, color="#2d8a4e", italic=True, font_family="Inter"),
             ]),
-            ft.Text("なくしものを探す", size=22, weight=ft.FontWeight.BOLD, font_family="Caveat"),
+            ft.Text("なくしものを探す", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#1a1a2e"),
             ft.Divider(height=8),
             search_dropdown,
             ft.Row([
@@ -153,8 +158,8 @@ class LostItemsApp(
         ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
         record_view = ft.Column([
-            ft.Text("見つけたらすぐに記録しましょう", size=13, color=ft.Colors.TEAL_700, italic=True),
-            ft.Text("新しい記録", size=22, weight=ft.FontWeight.BOLD, font_family="Caveat"),
+            ft.Text("見つけたらすぐに記録しましょう", size=13, color="#2d8a4e", italic=True, font_family="Inter"),
+            ft.Text("新しい記録", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#1a1a2e"),
             ft.Divider(height=8),
             ft.TextField(ref=self.name_ref, label="なくした物", hint_text="例: 鍵、スマホ、財布", width=300),
             ft.Dropdown(
@@ -189,7 +194,7 @@ class LostItemsApp(
             ft.ElevatedButton("記録する", on_click=self.on_add_record),
             ft.Divider(height=16),
             ft.Row([
-                ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD),
+                ft.Text("記録履歴", size=16, weight=ft.FontWeight.BOLD, font_family="Playfair Display"),
                 ft.Row([
                     ft.TextButton("エクスポート", on_click=self.show_export_dialog),
                     ft.TextButton("インポート", on_click=self.show_import_dialog),
@@ -199,7 +204,7 @@ class LostItemsApp(
         ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
         floorplan_view = ft.Column([
-            ft.Text("間取りを設定", size=22, weight=ft.FontWeight.BOLD, font_family="Caveat"),
+            ft.Text("間取りを設定", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#1a1a2e"),
             ft.Text("セルをタップして編集", size=12, color=ft.Colors.GREY_600, italic=True),
             ft.Divider(height=8),
             ft.Row([
@@ -242,8 +247,8 @@ class LostItemsApp(
                         ft.Tab(label="ランキング"),
                         ft.Tab(label="分析"),
                     ],
-                    indicator_color=ft.Colors.TEAL_600,
-                    label_color=ft.Colors.TEAL_800,
+                    indicator_color="#2d8a4e",
+                    label_color="#2d8a4e",
                     unselected_label_color=ft.Colors.GREY_600,
                 ),
                 ft.TabBarView(
@@ -259,8 +264,8 @@ class LostItemsApp(
         )
 
         page.appbar = ft.AppBar(
-            title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD, font_family="Caveat")], tight=True),
-            bgcolor=ft.Colors.TEAL_800,
+            title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD, font_family="Playfair Display")], tight=True),
+            bgcolor="#ff6b6b",
             color=ft.Colors.WHITE,
             center_title=True,
             actions=[
@@ -273,10 +278,7 @@ class LostItemsApp(
 
         page.overlay.append(self.date_picker)
         page.add(ft.Stack([
-            ft.Container(expand=True, gradient=ft.LinearGradient(
-                begin=ft.Alignment.TOP_LEFT, end=ft.Alignment.BOTTOM_RIGHT,
-                colors=[ft.Colors.AMBER_50, ft.Colors.TEAL_50],
-            )),
+            ft.Container(expand=True, bgcolor="#fff8f0"),
             ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE)),
             ft.SafeArea(expand=True, content=tabs),
         ], expand=True))
