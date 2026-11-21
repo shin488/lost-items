@@ -265,7 +265,7 @@ class LostItemsApp(
 
         page.appbar = ft.AppBar(
             title=ft.Row([ft.Text("なくしもの探知機", weight=ft.FontWeight.BOLD, font_family="Playfair Display")], tight=True),
-            bgcolor="#0e3b4f",
+            bgcolor="#4a90c2",
             color=ft.Colors.WHITE,
             center_title=True,
             actions=[
@@ -280,7 +280,7 @@ class LostItemsApp(
         page.add(ft.Stack([
             ft.Container(expand=True, gradient=ft.LinearGradient(
                 begin=ft.Alignment.TOP_LEFT, end=ft.Alignment.BOTTOM_RIGHT,
-                colors=["#0e3b4f", "#1a7f9a"],
+                colors=["#4a90c2", "#8ecfe8"],
             )),
             ft.Container(expand=True, bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE)),
             ft.SafeArea(expand=True, content=tabs),
