@@ -49,16 +49,13 @@ class SearchMixin:
         if not q:
             e.page.show_snack_bar(ft.SnackBar(content=ft.Text("検索キーワードが必要です"), bgcolor=ft.Colors.RED_400))
             return
-        if self.found_ref.current:
-            self.found_ref.current.value = "いいえ"
+        self.found_flag = "いいえ"
         self.name_ref.current.value = q
         self.date_ref.current.value = ""
         self.location_ref.current.value = ""
         self.name_ref.current.update()
         self.date_ref.current.update()
         self.location_ref.current.update()
-        if self.found_ref.current:
-            self.found_ref.current.update()
         self.tabs.selected_index = 1
         self.tabs.update()
 

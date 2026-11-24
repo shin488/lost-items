@@ -8,11 +8,16 @@ from ui_components import make_tappable_btn
 
 
 class RecordsMixin:
+    def _set_found(self, val):
+        self.found_flag = val
+        if self.found_loc_container is not None:
+            self.found_loc_container.visible = (val == "はい")
+            self.found_loc_container.update()
+
     def on_add_record(self, e):
         name = self.name_ref.current.value.strip()
         location = self.location_ref.current.value.strip()
-        found_flag = (self.found_ref.current.value if self.found_ref.current else "はい") or "はい"
-        found = found_flag == "はい"
+        found = (self.found_flag or "はい") == "はい"
         if not name:
             e.page.show_snack_bar(ft.SnackBar(
                 content=ft.Text("「なくした物」を入力してください"), bgcolor=ft.Colors.RED_400))
@@ -65,9 +70,7 @@ class RecordsMixin:
         self.category_ref.current.value = ""
         self.date_ref.current.value = datetime.now().strftime("%Y-%m-%d")
         self.location_ref.current.value = ""
-        if self.found_ref.current:
-            self.found_ref.current.value = "はい"
-            self.found_ref.current.update()
+        self.found_flag = "はい"
         self.name_ref.current.update()
         self.category_ref.current.update()
         self.date_ref.current.update()

@@ -73,7 +73,7 @@ class LostItemsApp(
         self.date_ref = ft.Ref[ft.TextField]()
         self.location_ref = ft.Ref[ft.TextField]()
         self.category_ref = ft.Ref[ft.Dropdown]()
-        self.found_ref = ft.Ref[ft.Dropdown]()
+        self.found_flag = "はい"
         self.search_dropdown_ref = ft.Ref[ft.Dropdown]()
 
         self.chips_container = ft.Column(spacing=4)
@@ -158,6 +158,17 @@ class LostItemsApp(
             self.simulation_container,
         ], scroll=ft.ScrollMode.AUTO, spacing=12)
 
+        found_loc_col = ft.Column([
+            ft.TextField(ref=self.location_ref, label="見つかった場所", hint_text="例: ソファの隙間", width=300),
+            ft.Column([
+                self.location_chips_container,
+                ft.Row([
+                    ft.TextButton("間取りから選ぶ", on_click=self.show_floorplan_selector, style=ft.ButtonStyle(color=ft.Colors.TEAL_700)),
+                ]),
+            ]),
+        ], visible=True)
+        self.found_loc_container = ft.Container(content=found_loc_col, visible=True)
+
         record_view = ft.Column([
             ft.Text("見つけたらすぐに記録しましょう", size=13, color="#ffffff", italic=True, font_family="Inter"),
             ft.Text("新しい記録", size=30, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#ffffff"),
@@ -183,25 +194,11 @@ class LostItemsApp(
                     suffix=ft.TextButton("日付選択", on_click=lambda _: self.open_date_picker()),
                 ),
             ]),
-            ft.TextField(ref=self.location_ref, label="見つかった場所",
-                         hint_text="例: ソファの隙間", width=300),
-            ft.Column([
-                self.location_chips_container,
-                ft.Row([
-                    ft.TextButton("間取りから選ぶ", on_click=self.show_floorplan_selector,
-                                  style=ft.ButtonStyle(color=ft.Colors.TEAL_700)),
-                ]),
-            ]),
-            ft.Dropdown(
-                ref=self.found_ref,
-                label="見つかったか",
-                value="はい",
-                width=300,
-                options=[
-                    ft.dropdown.Option("はい", "見つかった"),
-                    ft.dropdown.Option("いいえ", "まだ見つかっていない"),
-                ],
-            ),
+            self.found_loc_container,
+            ft.Row([
+                ft.FilledButton("見つかった", on_click=lambda e: self._set_found("はい")),
+                ft.FilledButton("まだ見つかっていない", on_click=lambda e: self._set_found("いいえ")),
+            ], spacing=8),
             ft.ElevatedButton("記録する", on_click=self.on_add_record),
             ft.Divider(height=16),
             ft.Row([
