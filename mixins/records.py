@@ -11,43 +11,63 @@ class RecordsMixin:
     def on_add_record(self, e):
         name = self.name_ref.current.value.strip()
         location = self.location_ref.current.value.strip()
+        found_flag = (self.found_ref.current.value if self.found_ref.current else "はい") or "はい"
+        found = found_flag == "はい"
         if not name:
             e.page.show_snack_bar(ft.SnackBar(
                 content=ft.Text("「なくした物」を入力してください"), bgcolor=ft.Colors.RED_400))
             return
-        if not location:
-            e.page.show_snack_bar(ft.SnackBar(
-                content=ft.Text("「見つかった場所」を入力してください"), bgcolor=ft.Colors.RED_400))
-            return
-        parts = location.split(" > ")
-        location_parts = {}
-        if len(parts) >= 1:
-            location_parts["room"] = parts[0]
-        if len(parts) >= 2:
-            location_parts["furniture"] = parts[1]
-        if len(parts) >= 3:
-            location_parts["spot"] = parts[2]
-        rec = {
-            "id": str(uuid.uuid4()),
-            "name": name,
-            "category": self.category_ref.current.value or "その他",
-            "location": location,
-            "location_parts": location_parts,
-            "lost_date": (self.date_ref.current.value or "").strip() or datetime.now().strftime("%Y-%m-%d"),
-            "found_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "resolved": False,
-            "resolution_date": None,
-        }
+        lost_date = (self.date_ref.current.value or "").strip() or datetime.now().strftime("%Y-%m-%d")
+        if found:
+            if not location:
+                e.page.show_snack_bar(ft.SnackBar(
+                    content=ft.Text("「見つかった場所」を入力してください"), bgcolor=ft.Colors.RED_400))
+                return
+            parts = location.split(" > ")
+            location_parts = {}
+            if len(parts) >= 1:
+                location_parts["room"] = parts[0]
+            if len(parts) >= 2:
+                location_parts["furniture"] = parts[1]
+            if len(parts) >= 3:
+                location_parts["spot"] = parts[2]
+            rec = {
+                "id": str(uuid.uuid4()),
+                "name": name,
+                "category": self.category_ref.current.value or "その他",
+                "location": location,
+                "location_parts": location_parts,
+                "lost_date": lost_date,
+                "found_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "resolved": True,
+                "resolution_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            }
+            e.page.show_snack_bar(ft.SnackBar(content=ft.Text("記録しました"), bgcolor=ft.Colors.TEAL_400))
+        else:
+            rec = {
+                "id": str(uuid.uuid4()),
+                "name": name,
+                "category": self.category_ref.current.value or "その他",
+                "location": "",
+                "location_parts": {},
+                "lost_date": lost_date,
+                "found_date": "",
+                "resolved": False,
+                "resolution_date": None,
+            }
+            e.page.show_snack_bar(ft.SnackBar(content=ft.Text("まだ見つかっていないものとして記録しました"), bgcolor=ft.Colors.TEAL_400))
         self.records = self.records + [rec]
         if not storage.save_records(self.page, self.records):
             e.page.show_snack_bar(ft.SnackBar(
                 content=ft.Text("保存に失敗しました"), bgcolor=ft.Colors.RED_400))
             return
-        e.page.show_snack_bar(ft.SnackBar(content=ft.Text("記録しました"), bgcolor=ft.Colors.TEAL_400))
         self.name_ref.current.value = ""
         self.category_ref.current.value = ""
         self.date_ref.current.value = datetime.now().strftime("%Y-%m-%d")
         self.location_ref.current.value = ""
+        if self.found_ref.current:
+            self.found_ref.current.value = "はい"
+            self.found_ref.current.update()
         self.name_ref.current.update()
         self.category_ref.current.update()
         self.date_ref.current.update()

@@ -73,6 +73,7 @@ class LostItemsApp(
         self.date_ref = ft.Ref[ft.TextField]()
         self.location_ref = ft.Ref[ft.TextField]()
         self.category_ref = ft.Ref[ft.Dropdown]()
+        self.found_ref = ft.Ref[ft.Dropdown]()
         self.search_dropdown_ref = ft.Ref[ft.Dropdown]()
 
         self.chips_container = ft.Column(spacing=4)
@@ -191,6 +192,16 @@ class LostItemsApp(
                                   style=ft.ButtonStyle(color=ft.Colors.TEAL_700)),
                 ]),
             ]),
+            ft.Dropdown(
+                ref=self.found_ref,
+                label="見つかったか",
+                value="はい",
+                width=300,
+                options=[
+                    ft.dropdown.Option("はい", "見つかった"),
+                    ft.dropdown.Option("いいえ", "まだ見つかっていない"),
+                ],
+            ),
             ft.ElevatedButton("記録する", on_click=self.on_add_record),
             ft.Divider(height=16),
             ft.Row([
