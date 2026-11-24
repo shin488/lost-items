@@ -91,6 +91,18 @@ class TestUnifiedPredict(unittest.TestCase):
         self.assertEqual(results, [fallback[0]])
         self.assertIn("一般的な傾向", ctx)
 
+    def test_unified_predict_multiple_seeds(self):
+        records = [
+            make_record("財布", "机の上", "財布"),
+            make_record("財布ケース", "カバンの中", "財布"),
+        ]
+        results, ctx = unified_predict("財布", records, None)
+        self.assertEqual(len(results), 2)
+        self.assertIn("起点2", ctx)
+        self.assertIn("直接一致", ctx)
+        top_count = sum(1 for r in results if r[3])
+        self.assertEqual(top_count, 1)
+
     def test_no_fuzzy_match_falls_back_to_default_tendencies(self):
         results, ctx = unified_predict("財布", [make_record("鍵", "玄関", "鍵")], None)
         self.assertEqual(len(results), len(DEFAULT_TENDENCIES["財布"]))
