@@ -182,7 +182,10 @@ def unified_predict(query_name, records, search_cat):
         results_list.append((loc, round(sc, 1), pct, False))
     if results_list:
         mp = max(r[2] for r in results_list)
-        results_list = [(l, w, p, p == mp) for l, w, p, _ in results_list]
+        results_list = [
+            (l, w, p, (i == 0 and p == mp))
+            for i, (l, w, p, _) in enumerate(results_list)
+        ]
 
     n_related = len(
         [n for n, sc in item_scores.items() if n not in seeds and sc > RELATED_SCORE_THRESHOLD]
