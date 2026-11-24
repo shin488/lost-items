@@ -44,6 +44,24 @@ class SearchMixin:
         self.results = None
         self.refresh()
 
+    def _on_record_not_found(self, e):
+        q = (self.search_val or "").strip()
+        if not q:
+            e.page.show_snack_bar(ft.SnackBar(content=ft.Text("検索キーワードが必要です"), bgcolor=ft.Colors.RED_400))
+            return
+        if self.found_ref.current:
+            self.found_ref.current.value = "いいえ"
+        self.name_ref.current.value = q
+        self.date_ref.current.value = ""
+        self.location_ref.current.value = ""
+        self.name_ref.current.update()
+        self.date_ref.current.update()
+        self.location_ref.current.update()
+        if self.found_ref.current:
+            self.found_ref.current.update()
+        self.tabs.selected_index = 1
+        self.tabs.update()
+
     def _render_results(self):
         if self.search_loading:
             self.results_container.controls = [ft.ProgressBar(color=ft.Colors.TEAL_600)]
@@ -56,7 +74,11 @@ class SearchMixin:
             self.simulation_container.controls = []
             return True
         if not self.results:
-            self.results_container.controls = [ft.Text("該当する記録がありません", color=ft.Colors.GREY_500)]
+            self.results_container.controls = [
+                ft.Text("該当する記録がありません", color=ft.Colors.GREY_500),
+                ft.Text("見つからなかった場合は「未解決」として記録できます", size=11, color=ft.Colors.GREY_600, italic=True),
+                ft.FilledButton("未解決のまま記録する", on_click=self._on_record_not_found),
+            ]
             self.simulation_container.controls = []
             return True
         return False
