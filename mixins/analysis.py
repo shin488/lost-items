@@ -11,8 +11,14 @@ class AnalysisMixin:
     def refresh_analysis(self):
         self.analysis_progress.visible = True
         self.page.update()
+        sections = self._build_analysis_sections(self.records)
+        self.analysis_container.controls = sections
+        self.analysis_progress.visible = False
+        self.analysis_container.update()
+        self.analysis_progress.update()
 
-        if not self.records:
+    def _build_analysis_sections(self, records):
+        if not records:
             self.analysis_container.controls = [
                 ft.Container(
                     ft.Column([
@@ -30,7 +36,7 @@ class AnalysisMixin:
         sections = []
 
         lost_by_date = {}
-        for r in self.records:
+        for r in records:
             d = (r.get("lost_date", "") or r.get("found_date", "")[:10])
             if d:
                 lost_by_date.setdefault(d, []).append(r)
@@ -104,11 +110,11 @@ class AnalysisMixin:
         sections.append(ft.Text("解決状況分析", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800))
         sections.append(ft.Divider(height=8))
 
-        resolved_records = [r for r in self.records if r.get("resolved")]
-        unresolved_records = [r for r in self.records if not r.get("resolved")]
+        resolved_records = [r for r in records if r.get("resolved")]
+        unresolved_records = [r for r in records if not r.get("resolved")]
         resolved_total = len(resolved_records)
         unresolved_total = len(unresolved_records)
-        total_recs = len(self.records)
+        total_recs = len(records)
         resolved_pct = resolved_total / total_recs * 100 if total_recs > 0 else 0
 
         sections.append(ft.Row([
@@ -218,7 +224,7 @@ class AnalysisMixin:
         loc_furniture = Counter()
         loc_combos = Counter()
         loc_len = 0
-        for r in self.records:
+        for r in records:
             lp = r.get("location_parts", {}) or {}
             if lp.get("room"):
                 loc_rooms[lp["room"]] += 1
@@ -259,9 +265,7 @@ class AnalysisMixin:
                         ft.Container(ft.Text(f"{cnt}件 {pct:.0f}%", size=10, color=ft.Colors.GREY_600)),
                     ]))
 
-        self.analysis_container.controls = sections
-        self.analysis_progress.visible = False
-        self.page.update()
+        return sections
 
     def _navigate_cal(self, delta):
         self.cal_month += delta
