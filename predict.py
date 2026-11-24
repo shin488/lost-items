@@ -73,16 +73,21 @@ def build_loc_sim_graph(records_slice):
     return graph
 
 
-def unified_predict(query_name, records, search_cat):
+def unified_predict(query_name, records, search_cat, fallback=None):
     if not query_name:
         return None, ""
+
+    def _default_tendencies():
+        if fallback is not None:
+            return fallback
+        return get_default_tendencies(query_name)
 
     pool = records if not search_cat else [r for r in records if r.get("category", "") == search_cat]
     item_to_loc, loc_to_item = build_item_loc_graph(pool)
     loc_sim = build_loc_sim_graph(pool)
 
     if not item_to_loc:
-        defaults = get_default_tendencies(query_name)
+        defaults = _default_tendencies()
         if defaults:
             return defaults, "一般的な傾向から予測（まだ記録がありません）"
         return [], ""
@@ -100,7 +105,7 @@ def unified_predict(query_name, records, search_cat):
             seeds = [n for n in item_to_loc if ntc.get(n) == q_cat]
     has_direct = bool(matched)
     if not seeds:
-        defaults = get_default_tendencies(query_name)
+        defaults = _default_tendencies()
         if defaults:
             return defaults, "一般的な傾向から予測（まだ記録がありません）"
         return [], ""
@@ -141,7 +146,7 @@ def unified_predict(query_name, records, search_cat):
             break
 
     if not location_scores:
-        defaults = get_default_tendencies(query_name)
+        defaults = _default_tendencies()
         if defaults:
             return defaults, "一般的な傾向から予測（まだ記録がありません）"
         return [], ""
@@ -171,7 +176,7 @@ def unified_predict(query_name, records, search_cat):
 
     total = sum(combined.values())
     if total == 0:
-        defaults = get_default_tendencies(query_name)
+        defaults = _default_tendencies()
         if defaults:
             return defaults, "一般的な傾向から予測（まだ記録がありません）"
         return [], ""

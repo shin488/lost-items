@@ -85,6 +85,12 @@ class TestUnifiedPredict(unittest.TestCase):
         self.assertEqual(results, [])
         self.assertEqual(ctx, "")
 
+    def test_unified_predict_uses_injected_fallback(self):
+        fallback = [("車の中", 1, 100.0, True)]
+        results, ctx = unified_predict("財布", [], None, fallback=fallback)
+        self.assertEqual(results, [fallback[0]])
+        self.assertIn("一般的な傾向", ctx)
+
     def test_no_fuzzy_match_falls_back_to_default_tendencies(self):
         results, ctx = unified_predict("財布", [make_record("鍵", "玄関", "鍵")], None)
         self.assertEqual(len(results), len(DEFAULT_TENDENCIES["財布"]))
