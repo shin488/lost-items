@@ -326,7 +326,8 @@ class RecordsMixin:
             ]
             return
 
-        hc = []
+        found_cards = []
+        lost_cards = []
         for i, r in enumerate(reversed(self.records)):
             idx = len(self.records) - 1 - i
             rid = r.get("id", str(idx))
@@ -351,17 +352,27 @@ class RecordsMixin:
             trailing_btns.append(make_tappable_btn("削除",
                 lambda e, rid=rid, n=r.get("name", ""): self.confirm_delete(rid, n),
                 color=ft.Colors.RED_400))
-            hc.append(
-                ft.Card(
-                    ft.ListTile(
-                        title=ft.Text(r.get("name", ""), weight=ft.FontWeight.W_500),
-                        subtitle=ft.Text(subtitle, size=13),
-                        trailing=ft.Row(trailing_btns, spacing=2),
-                    ),
-                    margin=3,
-                )
+            card = ft.Card(
+                ft.ListTile(
+                    title=ft.Text(r.get("name", ""), weight=ft.FontWeight.W_500),
+                    subtitle=ft.Text(subtitle, size=13),
+                    trailing=ft.Row(trailing_btns, spacing=2),
+                ),
+                margin=3,
             )
-        self.history_container.controls = hc
+            if resolved:
+                found_cards.append(card)
+            else:
+                lost_cards.append(card)
+
+        children = []
+        if found_cards:
+            children.append(ft.Text("見つかったもの", size=16, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color=ft.Colors.WHITE))
+            children.extend(found_cards)
+        if lost_cards:
+            children.append(ft.Text("まだ見つかっていないもの", size=16, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color=ft.Colors.WHITE))
+            children.extend(lost_cards)
+        self.history_container.controls = children
 
     def _render_ranking(self):
         if not self.records:
