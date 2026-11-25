@@ -3,7 +3,7 @@ CATEGORIES_KEY = "lost_items_categories_v1"
 FLOORPLAN_KEY = "lost_items_floorplan_v1"
 MAX_GRID = 30
 DEFAULT_CATEGORIES = ["財布", "鍵", "スマホ", "イヤホン", "傘", "本", "文房具", "衣類", "カバン", "その他"]
-FLOORPLAN_FURNITURE_PALETTE = ["ソファ", "テーブル", "デスク", "本棚", "ベッド", "椅子", "イス", "テレビ", "ラグ", "クローゼット", "収納", "机"]
+FLOORPLAN_FURNITURE_PALETTE = ["ソファ", "テーブル", "デスク", "本棚", "ベッド", "椅子", "テレビ", "ラグ", "クローゼット", "収納", "机", "コンロ", "冷蔵庫", "流し場"]
 WEEKDAYS_JP = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
 
 DEFAULT_TENDENCIES = {

@@ -85,7 +85,7 @@ class LostItemsApp(
         self.analysis_container = ft.Column(spacing=8)
         self.analysis_progress = ft.ProgressBar(visible=False, color=ft.Colors.TEAL_600)
         self.floorplan_grid_container = ft.Column(spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
-        self.furniture_palette = ft.Column(spacing=6)
+        self.furniture_palette = ft.Row(spacing=6, wrap=True, run_spacing=6, alignment=ft.MainAxisAlignment.START)
         self.furniture_chips = {}
         self.furn_placing = None
 
