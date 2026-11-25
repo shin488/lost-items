@@ -85,6 +85,9 @@ class LostItemsApp(
         self.analysis_container = ft.Column(spacing=8)
         self.analysis_progress = ft.ProgressBar(visible=False, color=ft.Colors.TEAL_600)
         self.floorplan_grid_container = ft.Column(spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        self.furniture_palette = ft.Column(spacing=6)
+        self.furniture_chips = {}
+        self.furn_placing = None
 
         self.date_picker = ft.DatePicker(
             on_change=self.on_date_selected,
@@ -108,6 +111,7 @@ class LostItemsApp(
             width=100,
         )
 
+        self.build_furniture_palette()
         self._build_views()
 
     def on_date_selected(self, e):
@@ -225,6 +229,10 @@ class LostItemsApp(
             ft.Text("グリッドサイズ: 最大 30×30", size=11, color=ft.Colors.GREY_500),
             ft.Divider(height=8),
             self.floorplan_grid_container,
+            ft.Divider(height=8),
+            ft.Text("家具を並べる", size=14, weight=ft.FontWeight.BOLD, font_family="Playfair Display", color="#ffffff"),
+            ft.Text("家具を選んでから部屋（セル）をタップして配置", size=11, color=ft.Colors.GREY_600, italic=True),
+            self.furniture_palette,
             ft.Divider(height=8),
             ft.TextButton("すべてリセット",
                 on_click=lambda e: (

@@ -1,6 +1,6 @@
 import flet as ft
 import storage
-from constants import MAX_GRID
+from constants import MAX_GRID, FLOORPLAN_FURNITURE_PALETTE
 
 
 class FloorplanMixin:
@@ -35,12 +35,64 @@ class FloorplanMixin:
                     bgcolor=ft.Colors.AMBER_50 if cell else ft.Colors.GREY_200,
                     border=ft.Border.all(1, ft.Colors.TEAL_300 if cell else ft.Colors.GREY_400),
                     border_radius=6, alignment=ft.Alignment.CENTER, ink=True,
-                    on_click=lambda e, rr=r, cc=c: self.edit_cell_dialog(rr, cc),
+                    on_click=lambda e, rr=r, cc=c: self.on_floorplan_cell_click(e, rr, cc),
                 )
                 row_cells.append(cont)
             grid_rows.append(ft.Row(row_cells, spacing=3, alignment=ft.MainAxisAlignment.CENTER))
         self.floorplan_grid_container.controls = grid_rows
         self.floorplan_grid_container.update()
+
+    def build_furniture_palette(self):
+        chips = []
+        for name in FLOORPLAN_FURNITURE_PALETTE:
+            chip = ft.Container(
+                content=ft.Text(name, size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800, text_align=ft.TextAlign.CENTER),
+                width=88, height=40,
+                bgcolor=ft.Colors.AMBER_100,
+                border=ft.Border.all(1, ft.Colors.AMBER_200),
+                border_radius=8, alignment=ft.Alignment.CENTER, ink=True,
+                on_click=lambda e, n=name: self.on_furniture_tap(n),
+            )
+            self.furniture_chips[name] = chip
+            chips.append(chip)
+        self.furniture_palette.controls = chips
+
+    def on_furniture_tap(self, name):
+        if self.furn_placing == name:
+            self.furn_placing = None
+            self.update_furniture_palette()
+            return
+        self.furn_placing = name
+        self.update_furniture_palette()
+
+    def update_furniture_palette(self):
+        for name, chip in self.furniture_chips.items():
+            selected = (self.furn_placing == name)
+            chip.bgcolor = ft.Colors.TEAL_100 if selected else ft.Colors.AMBER_100
+            chip.border = ft.Border.all(1, ft.Colors.TEAL_700 if selected else ft.Colors.AMBER_200)
+            chip.update()
+
+    def on_floorplan_cell_click(self, e, r, c):
+        if self.furn_placing:
+            name = self.furn_placing
+            self.furn_placing = None
+            self.update_furniture_palette()
+            self._place_furniture(r, c, name)
+            return
+        self.edit_cell_dialog(r, c)
+
+    def _place_furniture(self, r, c, name):
+        cells = self.floorplan.setdefault("cells", [])
+        cell = next((x for x in cells if x.get("r") == r and x.get("c") == c), None)
+        if cell is None:
+            cell = {"r": r, "c": c, "room": "部屋", "furniture": []}
+            cells.append(cell)
+        furniture = cell.setdefault("furniture", [])
+        if any(f.get("name") == name for f in furniture):
+            return
+        furniture.append({"name": name, "spots": []})
+        storage.save_floorplan(self.floorplan)
+        self.build_floorplan_grid()
 
     def edit_cell_dialog(self, r, c):
         def find_cell():
