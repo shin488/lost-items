@@ -73,7 +73,7 @@ class LostItemsApp(
         self.date_ref = ft.Ref[ft.TextField]()
         self.location_ref = ft.Ref[ft.TextField]()
         self.category_ref = ft.Ref[ft.Dropdown]()
-        self.found_flag = "はい"
+        self.found_flag = "いいえ"
         self.search_dropdown_ref = ft.Ref[ft.Dropdown]()
 
         self.chips_container = ft.Column(spacing=4)
@@ -167,7 +167,7 @@ class LostItemsApp(
                 ]),
             ]),
         ], visible=True)
-        self.found_loc_container = ft.Container(content=found_loc_col, visible=True)
+        self.found_loc_container = ft.Container(content=found_loc_col, visible=(self.found_flag == "はい"))
 
         record_view = ft.Column([
             ft.Text("見つけたらすぐに記録しましょう", size=13, color="#ffffff", italic=True, font_family="Inter"),

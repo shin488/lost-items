@@ -70,7 +70,7 @@ class RecordsMixin:
         self.category_ref.current.value = ""
         self.date_ref.current.value = datetime.now().strftime("%Y-%m-%d")
         self.location_ref.current.value = ""
-        self.found_flag = "はい"
+        self.found_flag = "いいえ"
         self.name_ref.current.update()
         self.category_ref.current.update()
         self.date_ref.current.update()
