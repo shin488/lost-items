@@ -1,3 +1,5 @@
+import time
+
 import flet as ft
 import storage
 from constants import MAX_GRID, FLOORPLAN_FURNITURE_PALETTE
@@ -26,11 +28,41 @@ class FloorplanMixin:
                                 text_align=ft.TextAlign.CENTER, no_wrap=True,
                                 overflow=ft.TextOverflow.ELLIPSIS)
                     ]
+                    inner.append(
+                        ft.Container(
+                            content=ft.Text("✕", size=12, color=ft.Colors.RED_400, text_align=ft.TextAlign.CENTER),
+                            width=cs, height=20,
+                            alignment=ft.Alignment.CENTER,
+                            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.RED_50),
+                            border=ft.Border.all(1, ft.Colors.RED_200),
+                            border_radius=10,
+                            on_click=lambda e, rr=r, cc=c, fn=furn_names[0]: self.delete_cell_furniture(rr, cc, fn),
+                            ink=True,
+                        )
+                    )
                 else:
                     inner = [ft.Text(label, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)]
                 cs = self.floorplan.get("cell_size", 80)
+                stack_content = [
+                    ft.Container(
+                        content=ft.Column(inner, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1, tight=True),
+                    ),
+                ]
+                if furn_names:
+                    # 家具が入っているセルには、誤って入れた家具を消せるよう「✕」を出す
+                    stack_content.append(
+                        ft.Container(
+                            content=ft.Text("✕", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400),
+                            width=24, height=24, padding=3,
+                            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.RED_50),
+                            border=ft.Border.all(1, ft.Colors.RED_300),
+                            border_radius=99, alignment=ft.Alignment.CENTER, ink=True,
+                            tooltip="このセルの家具を削除",
+                            on_click=lambda e, rr=r, cc=c: self.delete_cell_furniture(rr, cc),
+                        )
+                    )
                 cont = ft.Container(
-                    content=ft.Column(inner, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1, tight=True),
+                    content=ft.Stack(stack_content, alignment=ft.Alignment.CENTER),
                     width=cs, height=int(cs * 0.75),
                     bgcolor=ft.Colors.AMBER_50 if cell else ft.Colors.GREY_200,
                     border=ft.Border.all(1, ft.Colors.TEAL_300 if cell else ft.Colors.GREY_400),
@@ -73,6 +105,9 @@ class FloorplanMixin:
             chip.update()
 
     def on_floorplan_cell_click(self, e, r, c):
+        # 「✕」タップからの同じセルへのクリックは、削除済みなので無視する
+        if time.time() - self._cell_tap_guard_ts < 0.5:
+            return
         if self.furn_placing:
             name = self.furn_placing
             self.furn_placing = None
@@ -80,6 +115,20 @@ class FloorplanMixin:
             self._place_furniture(r, c, name)
             return
         self.edit_cell_dialog(r, c)
+
+    def delete_cell_furniture(self, r, c):
+        cell = next(
+            (x for x in self.floorplan.get("cells", []) if x.get("r") == r and x.get("c") == c),
+            None,
+        )
+        if not cell or not cell.get("furniture"):
+            return
+        count = len(cell["furniture"])
+        cell["furniture"] = []
+        storage.save_floorplan(self.floorplan)
+        self._cell_tap_guard_ts = time.time()
+        self.build_floorplan_grid()
+        self.page.show_snack_bar(ft.SnackBar(content=ft.Text(f"セル({r+1},{c+1}) の家具を削除しました（{count}件）")))
 
     def _place_furniture(self, r, c, name):
         cells = self.floorplan.setdefault("cells", [])
@@ -93,6 +142,17 @@ class FloorplanMixin:
         furniture.append({"name": name, "spots": []})
         storage.save_floorplan(self.floorplan)
         self.build_floorplan_grid()
+
+    def delete_cell_furniture(self, r, c, name):
+        cell = next((x for x in self.floorplan.get("cells", []) if x.get("r") == r and x.get("c") == c), None)
+        if not cell:
+            return
+        furniture = cell.setdefault("furniture", [])
+        kept = [f for f in furniture if f.get("name") != name]
+        if len(kept) != len(furniture):
+            cell["furniture"] = kept
+            storage.save_floorplan(self.floorplan)
+            self.build_floorplan_grid()
 
     def edit_cell_dialog(self, r, c):
         def find_cell():

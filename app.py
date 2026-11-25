@@ -88,6 +88,7 @@ class LostItemsApp(
         self.furniture_palette = ft.Row(spacing=6, wrap=True, run_spacing=6, alignment=ft.MainAxisAlignment.START)
         self.furniture_chips = {}
         self.furn_placing = None
+        self._cell_tap_guard_ts = 0.0
 
         self.date_picker = ft.DatePicker(
             on_change=self.on_date_selected,
