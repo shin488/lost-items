@@ -16,18 +16,18 @@ class FloorplanMixin:
                     None,
                 )
                 label = cell.get("room", "") if cell else ""
-                inner = [ft.Text(label, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)]
-                if cell:
-                    furn_names = [f.get("name", "") for f in cell.get("furniture", [])]
-                    if furn_names:
-                        display = ", ".join(furn_names[:3])
-                        if len(furn_names) > 3:
-                            display += "…"
-                        inner.append(
-                            ft.Text(display, size=8, color=ft.Colors.GREY_600,
-                                    text_align=ft.TextAlign.CENTER, no_wrap=True,
-                                    overflow=ft.TextOverflow.ELLIPSIS)
-                        )
+                furn_names = [f.get("name", "") for f in cell.get("furniture", [])] if cell else []
+                if furn_names:
+                    display = ", ".join(furn_names[:3])
+                    if len(furn_names) > 3:
+                        display += "…"
+                    inner = [
+                        ft.Text(display, size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.TEAL_800,
+                                text_align=ft.TextAlign.CENTER, no_wrap=True,
+                                overflow=ft.TextOverflow.ELLIPSIS)
+                    ]
+                else:
+                    inner = [ft.Text(label, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)]
                 cs = self.floorplan.get("cell_size", 80)
                 cont = ft.Container(
                     content=ft.Column(inner, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1, tight=True),
